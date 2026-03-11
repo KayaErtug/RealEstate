@@ -16,70 +16,80 @@ const dictionary: Dictionary = {
   'nav.beInvestor': { tr: 'YATIRIMCIMIZ OL', en: 'BECOME AN INVESTOR' },
   'nav.suggestProperty': { tr: 'GAYRİMENKUL ÖNER', en: 'SUGGEST A PROPERTY' },
 
-  // Home hero
+  // Home
   'home.heroTitle': { tr: 'Hayalinizdeki Evi veya Arsayı Bulun', en: 'Find Your Dream Home or Land' },
-  'home.heroSubtitle': { tr: 'Onlarca ilan arasından size en uygun olanı seçin', en: 'Choose the perfect one among dozens of listings' },
+  'home.heroSubtitle': { tr: 'Binlerce ilan arasından size en uygun olanı seçin', en: 'Choose the perfect one among thousands of listings' },
   'home.searchPlaceholder': { tr: 'Şehir, ilçe veya mahalle ara...', en: 'Search city, district or neighborhood...' },
-  'home.search': { tr: 'Ara', en: 'Search' },
+  'home.search': { tr: 'İlan Ara', en: 'Search' },
+  'home.searchButton': { tr: 'İlan Ara', en: 'Search' },
 
-  // Home features
-  'home.feature1.title': { tr: 'Geniş İlan Portföyü', en: 'Wide Listing Portfolio' },
-  'home.feature1.desc': { tr: 'Satılık ve kiralık onlarca gayrimenkul ilanı', en: 'Dozens of properties for sale and rent' },
-  'home.feature2.title': { tr: 'Profesyonel Hizmet', en: 'Professional Service' },
-  'home.feature2.desc': { tr: 'Uzman ekibimizle güvenli alışveriş', en: 'Secure experience with our expert team' },
-  'home.feature3.title': { tr: 'Güvenilir Platform', en: 'Trusted Platform' },
-  'home.feature3.desc': { tr: 'Yıllara dayanan tecrübe ve güven', en: 'Years of experience and trust' },
+  'home.feature1.title': { tr: 'Geniş Portföy', en: 'Wide Portfolio' },
+  'home.feature1.desc': { tr: 'Satılık ve kiralık birçok gayrimenkul seçeneğini tek yerde inceleyin.', en: 'Browse many sale and rental property options in one place.' },
 
-  // Home listings
-  'home.featuredTitle': { tr: 'Öne Çıkan İlanlar', en: 'Featured Listings' },
-  'home.viewAll': { tr: 'Tümünü Gör →', en: 'View all →' },
-  'home.noFeatured': { tr: 'Henüz öne çıkan ilan bulunmamaktadır.', en: 'No featured listings yet.' },
+  'home.feature2.title': { tr: 'Güvenilir Hizmet', en: 'Reliable Service' },
+  'home.feature2.desc': { tr: 'Doğru bilgi ve profesyonel destekle kararınızı güvenle verin.', en: 'Make your decision confidently with accurate information and professional support.' },
 
-  // Home CTA
-  'home.ctaTitle': { tr: 'Hayalinizdeki Evi veya Arsayı Bulmaya Hazır Mısınız?', en: 'Ready to Find Your Dream Home or Land?' },
-  'home.ctaSubtitle': { tr: 'İhtiyacınıza en uygun gayrimenkulleri keşfedin', en: 'Discover the best properties for your needs' },
-  'home.ctaButton': { tr: 'İlanları İncele', en: 'Browse Listings' },
+  'home.feature3.title': { tr: 'Uzman Danışmanlık', en: 'Expert Consultancy' },
+  'home.feature3.desc': { tr: 'Bölgeye hâkim ekibimizle ihtiyaçlarınıza uygun çözümler sunuyoruz.', en: 'Our local expert team provides solutions tailored to your needs.' },
 
-  // Property card
-  'property.featured': { tr: 'Öne Çıkan', en: 'Featured' },
-  'property.rooms': { tr: 'Oda', en: 'Rooms' },
+  'home.featuredTitle': { tr: 'Öne Çıkan Gayrimenkuller', en: 'Featured Properties' },
+  'home.featuredProperties': { tr: 'Öne Çıkan Gayrimenkuller', en: 'Featured Properties' },
+  'home.featuredVehicles': { tr: 'Öne Çıkan Araçlar', en: 'Featured Vehicles' },
+  'home.viewAll': { tr: 'Tümünü Gör', en: 'View All' },
+  'home.noFeatured': { tr: 'Şu anda öne çıkan ilan bulunmuyor.', en: 'There are no featured listings at the moment.' },
 
-  // Status labels
-  'status.for_sale': { tr: 'Satılık', en: 'For Sale' },
-  'status.for_rent': { tr: 'Kiralık', en: 'For Rent' },
-  'status.sold': { tr: 'Satıldı', en: 'Sold' },
-  'status.rented': { tr: 'Kiralandı', en: 'Rented' },
+  'home.ctaTitle': { tr: 'Size Uygun Gayrimenkulü Hemen Keşfedin', en: 'Discover the Right Property for You' },
+  'home.ctaSubtitle': { tr: 'Portföyümüzdeki ilanları inceleyin, size en uygun seçeneği kolayca bulun.', en: 'Browse our listings and easily find the option that suits you best.' },
+  'home.ctaButton': { tr: 'İlanları Görüntüle', en: 'View Listings' },
 
-  // Property type labels
-  'type.apartment': { tr: 'Daire', en: 'Apartment' },
-  'type.villa': { tr: 'Villa', en: 'Villa' },
-  'type.office': { tr: 'Ofis', en: 'Office' },
-  'type.land': { tr: 'Arsa', en: 'Land' },
-  'type.commercial': { tr: 'Ticari', en: 'Commercial' },
+  // Filters
+  'filter.showFilters': { tr: 'Filtreleri Göster', en: 'Show Filters' },
+  'filter.hideFilters': { tr: 'Filtreleri Gizle', en: 'Hide Filters' },
+  'filter.status': { tr: 'Durum', en: 'Status' },
+  'filter.priceRange': { tr: 'Fiyat Aralığı', en: 'Price Range' },
 
-  // Footer
-  'footer.about': {
-    tr: 'Varol Gayrimenkul A.Ş. ile güvenli alım-satım ve yatırım fırsatlarını keşfedin.',
-    en: 'Discover secure buying, selling, and investment opportunities with Varol Real Estate Inc.',
-  },
-  'footer.quickLinks': { tr: 'Hızlı Linkler', en: 'Quick Links' },
-  'footer.contact': { tr: 'İletişim', en: 'Contact' },
-  'footer.rights': { tr: '© 2025 Varol Gayrimenkul A.Ş. Tüm hakları saklıdır.', en: '© 2025 Varol Real Estate Inc. All rights reserved.' },
+  // Common
+  'common.loading': { tr: 'Yükleniyor...', en: 'Loading...' },
+  'common.noResults': { tr: 'Sonuç bulunamadı.', en: 'No results found.' },
+  'common.back': { tr: 'Geri Dön', en: 'Back' },
+
+  // Detail
+  'detail.description': { tr: 'Açıklama', en: 'Description' },
 
   // Cookie
   'cookie.text': {
-    tr: 'Gizliliğinize değer veriyoruz. Tarama deneyiminizi geliştirmek için çerezleri kullanıyoruz.',
-    en: 'We value your privacy. We use cookies to improve your browsing experience.',
+    tr: 'Sitemizde deneyiminizi geliştirmek için çerezler kullanıyoruz. Devam ederek çerez kullanımını kabul edebilir veya reddedebilirsiniz.',
+    en: 'We use cookies to improve your experience on our website. You can accept or reject cookie usage.',
   },
-  'cookie.accept': { tr: 'Tümünü Kabul Et', en: 'Accept All' },
   'cookie.reject': { tr: 'Reddet', en: 'Reject' },
+  'cookie.accept': { tr: 'Kabul Et', en: 'Accept' },
+
+  // Footer
+  'footer.about': {
+    tr: 'Varol Gayrimenkul olarak Denizli ve çevresinde güvenilir, hızlı ve profesyonel emlak danışmanlığı sunuyoruz.',
+    en: 'As Varol Real Estate, we provide reliable, fast, and professional real estate consultancy in Denizli and surrounding areas.',
+  },
+  'footer.quickLinks': { tr: 'Hızlı Bağlantılar', en: 'Quick Links' },
+  'footer.contact': { tr: 'İletişim', en: 'Contact' },
+  'footer.rights': { tr: '© 2026 Varol Gayrimenkul. Tüm hakları saklıdır.', en: '© 2026 Varol Real Estate. All rights reserved.' },
+
+  // Share
+  'share.title': { tr: 'İlanı Paylaş', en: 'Share Listing' },
+  'share.whatsapp': { tr: 'WhatsApp', en: 'WhatsApp' },
+  'share.facebook': { tr: 'Facebook', en: 'Facebook' },
+  'share.instagram': { tr: 'Instagram', en: 'Instagram' },
+  'share.copyLink': { tr: 'Linki Kopyala', en: 'Copy Link' },
+  'share.copied': { tr: 'Link kopyalandı!', en: 'Link copied!' },
 
   // AI
   'ai.greeting': {
     tr: 'Merhaba! Ben Varol Gayrimenkul AI asistanıyım. Size nasıl yardımcı olabilirim?',
-    en: 'Hi! I am the Varol Real Estate AI assistant. How can I help you?'
+    en: 'Hello! I am the Varol Real Estate AI assistant. How can I help you?',
   },
-  'ai.inactive': { tr: 'AI asistan şu an aktif değil', en: 'AI assistant is currently unavailable' },
+  'ai.inactive': {
+    tr: 'AI özelliği şu anda aktif değil. Yönetim panelinden API anahtarı eklendiğinde kullanılabilir.',
+    en: 'The AI feature is not active right now. It will work after an API key is added.',
+  },
   'ai.placeholder': { tr: 'Mesajınızı yazın...', en: 'Type your message...' },
   'ai.send': { tr: 'Gönder', en: 'Send' },
 };
@@ -90,7 +100,7 @@ type LanguageContextValue = {
   t: (key: string) => string;
 };
 
-const LanguageContext = createContext<LanguageContextValue | null>(null);
+const LanguageContext = createContext<LanguageContextValue | undefined>(undefined);
 
 const STORAGE_KEY = 'varol_language';
 
@@ -98,13 +108,23 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<Language>('tr');
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved === 'tr' || saved === 'en') setLanguageState(saved);
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved === 'tr' || saved === 'en') {
+        setLanguageState(saved);
+      }
+    } catch (e) {
+      console.error('Storage error', e);
+    }
   }, []);
 
   const setLanguage = (lang: Language) => {
     setLanguageState(lang);
-    localStorage.setItem(STORAGE_KEY, lang);
+    try {
+      localStorage.setItem(STORAGE_KEY, lang);
+    } catch (e) {
+      console.error('Storage set error', e);
+    }
   };
 
   const t = (key: string) => {
@@ -119,7 +139,9 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 }
 
 export function useLanguage() {
-  const ctx = useContext(LanguageContext);
-  if (!ctx) throw new Error('useLanguage must be used within LanguageProvider');
-  return ctx;
+  const context = useContext(LanguageContext);
+  if (context === undefined) {
+    throw new Error('useLanguage must be used within a LanguageProvider');
+  }
+  return context;
 }

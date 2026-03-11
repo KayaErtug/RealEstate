@@ -10,7 +10,7 @@ interface VehicleFormProps {
 }
 
 export default function VehicleForm({ vehicle, onClose }: VehicleFormProps) {
-  const { user } = useAuth();
+  const { user, profile, isSuperAdmin } = useAuth();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
@@ -27,8 +27,19 @@ export default function VehicleForm({ vehicle, onClose }: VehicleFormProps) {
     km: '',
     transmission: 'automatic',
     fuel: 'gasoline',
+    body_type: '',
+    color: '',
+    engine: '',
+    engine_power_hp: '',
+    drive_type: '',
+    doors: '',
+    seats: '',
+    damage_status: '',
+    swap_available: false,
     images: '',
     featured: false,
+    contact_name: '',
+    contact_phone: '',
   });
 
   useEffect(() => {
@@ -48,11 +59,28 @@ export default function VehicleForm({ vehicle, onClose }: VehicleFormProps) {
         km: vehicle.km.toString(),
         transmission: vehicle.transmission,
         fuel: vehicle.fuel,
+        body_type: vehicle.body_type || '',
+        color: vehicle.color || '',
+        engine: vehicle.engine || '',
+        engine_power_hp: vehicle.engine_power_hp?.toString() || '',
+        drive_type: vehicle.drive_type || '',
+        doors: vehicle.doors?.toString() || '',
+        seats: vehicle.seats?.toString() || '',
+        damage_status: vehicle.damage_status || '',
+        swap_available: vehicle.swap_available,
         images: vehicle.images.join('\n'),
         featured: vehicle.featured,
+        contact_name: vehicle.contact_name || '',
+        contact_phone: vehicle.contact_phone || '',
       });
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        contact_name: prev.contact_name || profile?.display_name || '',
+        contact_phone: prev.contact_phone || profile?.phone || '',
+      }));
     }
-  }, [vehicle]);
+  }, [vehicle, profile]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,8 +107,22 @@ export default function VehicleForm({ vehicle, onClose }: VehicleFormProps) {
         km: parseInt(formData.km),
         transmission: formData.transmission,
         fuel: formData.fuel,
+        body_type: formData.body_type || null,
+        color: formData.color || null,
+        engine: formData.engine || null,
+        engine_power_hp: formData.engine_power_hp ? parseInt(formData.engine_power_hp) : null,
+        drive_type: formData.drive_type || null,
+        doors: formData.doors ? parseInt(formData.doors) : null,
+        seats: formData.seats ? parseInt(formData.seats) : null,
+        damage_status: formData.damage_status || null,
+        swap_available: formData.swap_available,
         images: imageUrls,
         featured: formData.featured,
+        contact_name: formData.contact_name || null,
+        contact_phone: formData.contact_phone || null,
+        moderation_status: isSuperAdmin ? (vehicle?.moderation_status || 'approved') : 'pending',
+        approved_at: isSuperAdmin ? (vehicle?.approved_at || new Date().toISOString()) : null,
+        approved_by: isSuperAdmin ? (vehicle?.approved_by || user?.id || null) : null,
         user_id: user?.id,
       };
 
@@ -140,6 +182,32 @@ export default function VehicleForm({ vehicle, onClose }: VehicleFormProps) {
                   required
                   rows={4}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cta focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  İlan Veren (Ad Soyad)
+                </label>
+                <input
+                  type="text"
+                  value={formData.contact_name}
+                  onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cta focus:border-transparent"
+                  placeholder="Ad Soyad"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  İlan Veren Telefon
+                </label>
+                <input
+                  type="tel"
+                  value={formData.contact_phone}
+                  onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cta focus:border-transparent"
+                  placeholder="05xx xxx xx xx"
                 />
               </div>
 
@@ -281,6 +349,121 @@ export default function VehicleForm({ vehicle, onClose }: VehicleFormProps) {
                   <option value="electric">Elektrik</option>
                   <option value="lpg">LPG</option>
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Kasa Tipi</label>
+                <select
+                  value={formData.body_type}
+                  onChange={(e) => setFormData({ ...formData, body_type: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cta focus:border-transparent"
+                >
+                  <option value="">Seçiniz</option>
+                  <option value="sedan">Sedan</option>
+                  <option value="hatchback">Hatchback</option>
+                  <option value="station_wagon">Station Wagon</option>
+                  <option value="suv">SUV</option>
+                  <option value="pickup">Pick-up</option>
+                  <option value="van">Van / Minivan</option>
+                  <option value="coupe">Coupe</option>
+                  <option value="cabrio">Cabrio</option>
+                  <option value="motorcycle">Motosiklet</option>
+                  <option value="commercial">Ticari Araç</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Renk</label>
+                <input
+                  type="text"
+                  value={formData.color}
+                  onChange={(e) => setFormData({ ...formData, color: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cta focus:border-transparent"
+                  placeholder="Beyaz, Siyah, Gri..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Motor</label>
+                <input
+                  type="text"
+                  value={formData.engine}
+                  onChange={(e) => setFormData({ ...formData, engine: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cta focus:border-transparent"
+                  placeholder="1.6, 2.0 TDI, 1.5 Hybrid..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Motor Gücü (HP)</label>
+                <input
+                  type="number"
+                  value={formData.engine_power_hp}
+                  onChange={(e) => setFormData({ ...formData, engine_power_hp: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cta focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Çekiş</label>
+                <select
+                  value={formData.drive_type}
+                  onChange={(e) => setFormData({ ...formData, drive_type: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cta focus:border-transparent"
+                >
+                  <option value="">Seçiniz</option>
+                  <option value="fwd">Önden Çekiş</option>
+                  <option value="rwd">Arkadan İtiş</option>
+                  <option value="awd">4x4 / AWD</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Kapı Sayısı</label>
+                <input
+                  type="number"
+                  value={formData.doors}
+                  onChange={(e) => setFormData({ ...formData, doors: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cta focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Koltuk Sayısı</label>
+                <input
+                  type="number"
+                  value={formData.seats}
+                  onChange={(e) => setFormData({ ...formData, seats: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cta focus:border-transparent"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Hasar Durumu</label>
+                <select
+                  value={formData.damage_status}
+                  onChange={(e) => setFormData({ ...formData, damage_status: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-cta focus:border-transparent"
+                >
+                  <option value="">Seçiniz</option>
+                  <option value="none">Hasarsız</option>
+                  <option value="paint">Boyalı</option>
+                  <option value="replace">Değişen</option>
+                  <option value="damage">Hasarlı</option>
+                </select>
+              </div>
+
+              <div className="md:col-span-2 flex items-center gap-2">
+                <input
+                  id="swap_available"
+                  type="checkbox"
+                  checked={formData.swap_available}
+                  onChange={(e) => setFormData({ ...formData, swap_available: e.target.checked })}
+                  className="h-4 w-4 text-cta focus:ring-cta border-gray-300 rounded"
+                />
+                <label htmlFor="swap_available" className="text-sm font-medium text-gray-700">
+                  Takasa uygun
+                </label>
               </div>
 
               <div className="md:col-span-2">

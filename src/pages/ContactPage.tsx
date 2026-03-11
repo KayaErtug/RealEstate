@@ -138,8 +138,8 @@ export default function ContactPage() {
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-1">Telefon</h3>
-                    <p className="text-gray-600">+90 555 123 4567</p>
-                    <p className="text-gray-600">+90 555 765 4321</p>
+                    <p className="text-gray-600">+90 258 211 07 18</p>
+                    <p className="text-gray-600">+90 532 340 20 36</p>
                   </div>
                 </div>
 
@@ -150,7 +150,7 @@ export default function ContactPage() {
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-1">E-posta</h3>
                     <p className="text-gray-600">info@varolgayrimenkul.com</p>
-                    <p className="text-gray-600">destek@varolgayrimenkul.com</p>
+                    <p className="text-gray-600">varol@varolgayrimenkul.com</p>
                   </div>
                 </div>
 
@@ -161,9 +161,8 @@ export default function ContactPage() {
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-1">Adres</h3>
                     <p className="text-gray-600">
-                      Atatürk Caddesi No: 123<br />
-                      Merkez/İSTANBUL<br />
-                      34000 Türkiye
+                      İstiklal Mah. Zübeyde Hn. Caddesi No:34/A8 Pamukkale/Denizli<br />
+                      20150 Türkiye
                     </p>
                   </div>
                 </div>

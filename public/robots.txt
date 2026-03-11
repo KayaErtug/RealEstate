@@ -1,0 +1,9 @@
+// public/robots.txt
+User-agent: *
+Allow: /
+
+Disallow: /admin
+Disallow: /login
+Disallow: /favorites
+
+Sitemap: https://varolgayrimenkul.com/sitemap.xml

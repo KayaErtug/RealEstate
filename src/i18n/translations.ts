@@ -1,0 +1,101 @@
+export const translations = {
+    tr: {
+      common: {
+        back: "Geri Dön",
+        loading: "Yükleniyor...",
+        notFound: "İlan bulunamadı",
+        backToListings: "İlanlara Dön",
+        contact: "İletişim",
+        phone: "Telefon",
+        email: "E-posta",
+        requestInfo: "Bilgi Al",
+        send: "Gönder",
+        sending: "Gönderiliyor...",
+        messageSent: "Mesajınız gönderildi!",
+        nameSurname: "Adınız Soyadınız",
+        message: "Mesajınız",
+      },
+      property: {
+        rooms: "Oda",
+        bathrooms: "Banyo",
+        area: "Alan",
+        net: "Net",
+        gross: "Brüt",
+        buildingAge: "Bina Yaşı",
+        years: "Yıl",
+        floorTotal: "Kat / Toplam Kat",
+        heating: "Isıtma",
+        dues: "Aidat",
+        frontage: "Cephe",
+        deedStatus: "Tapu Durumu",
+        usageStatus: "Kullanım Durumu",
+        description: "Açıklama",
+        features: "Özellikler",
+        inSite: "Site İçinde",
+        furnished: "Eşyalı",
+        parking: "Otopark",
+        elevator: "Asansör",
+        balcony: "Balkon",
+        garden: "Bahçe",
+        pool: "Havuz",
+        security: "Güvenlik",
+      },
+      contactForm: {
+        errorSend: "Mesaj gönderilirken bir hata oluştu. Lütfen tekrar deneyin.",
+      },
+    },
+    en: {
+      common: {
+        back: "Back",
+        loading: "Loading...",
+        notFound: "Listing not found",
+        backToListings: "Back to listings",
+        contact: "Contact",
+        phone: "Phone",
+        email: "Email",
+        requestInfo: "Request info",
+        send: "Send",
+        sending: "Sending...",
+        messageSent: "Your message has been sent!",
+        nameSurname: "Full name",
+        message: "Message",
+      },
+      property: {
+        rooms: "Rooms",
+        bathrooms: "Bathrooms",
+        area: "Area",
+        net: "Net",
+        gross: "Gross",
+        buildingAge: "Building age",
+        years: "Years",
+        floorTotal: "Floor / Total floors",
+        heating: "Heating",
+        dues: "Dues",
+        frontage: "Facade",
+        deedStatus: "Deed status",
+        usageStatus: "Usage status",
+        description: "Description",
+        features: "Features",
+        inSite: "In a site",
+        furnished: "Furnished",
+        parking: "Parking",
+        elevator: "Elevator",
+        balcony: "Balcony",
+        garden: "Garden",
+        pool: "Pool",
+        security: "Security",
+      },
+      contactForm: {
+        errorSend: "An error occurred while sending your message. Please try again.",
+      },
+    },
+  } as const;
+  
+  export type Lang = keyof typeof translations;
+  
+  export function t(lang: Lang, path: string): string {
+    const parts = path.split(".");
+    let cur: any = translations[lang];
+    for (const p of parts) cur = cur?.[p];
+    return typeof cur === "string" ? cur : path;
+  }

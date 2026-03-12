@@ -13,18 +13,28 @@ import {
   BarChart3,
   Clock3,
   TrendingUp,
+  Upload,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import type { Property, Inquiry, Vehicle } from '../lib/database.types';
+import type { Property, Inquiry, Vehicle, ProfileUpdate } from '../lib/database.types';
 import PropertyForm from '../components/PropertyForm';
 import VehicleForm from '../components/VehicleForm';
+import BulkPropertyImportPanel from '../components/BulkPropertyImportPanel';
 
 interface AdminPageProps {
   onNavigate: (page: string, propertyId?: string) => void;
 }
 
-type AdminTab = 'properties' | 'vehicles' | 'inquiries' | 'approvals' | 'users';
+type UserRole = 'super_admin' | 'user';
+
+type AdminTab =
+  | 'properties'
+  | 'vehicles'
+  | 'inquiries'
+  | 'approvals'
+  | 'users'
+  | 'bulk_import';
 
 type DashboardStats = {
   totalProperties: number;
@@ -38,23 +48,6 @@ type DashboardStats = {
   mostViewedProperties: Property[];
 };
 
-type ProfileRole = 'super_admin' | 'user';
-
-type ProfileRow = {
-  user_id: string;
-  email: string | null;
-  display_name: string | null;
-  phone: string | null;
-  role: ProfileRole;
-  updated_at?: string;
-};
-
-type ProfilePatch = {
-  display_name?: string | null;
-  phone?: string | null;
-  role?: ProfileRole;
-};
-
 const EMPTY_DASHBOARD: DashboardStats = {
   totalProperties: 0,
   totalVehicles: 0,
@@ -65,6 +58,15 @@ const EMPTY_DASHBOARD: DashboardStats = {
   totalInquiries: 0,
   latestProperties: [],
   mostViewedProperties: [],
+};
+
+type ProfileRow = {
+  user_id: string;
+  email: string | null;
+  display_name: string | null;
+  phone: string | null;
+  role: UserRole;
+  updated_at: string | null;
 };
 
 export default function AdminPage({ onNavigate }: AdminPageProps) {
@@ -99,7 +101,7 @@ export default function AdminPage({ onNavigate }: AdminPageProps) {
 
     void loadData();
     void loadDashboardStats();
-  }, [user, activeTab, isSuperAdmin, onNavigate]);
+  }, [user, activeTab, isSuperAdmin]);
 
   useEffect(() => {
     setMyDisplayName(profile?.display_name || '');
@@ -126,8 +128,8 @@ export default function AdminPage({ onNavigate }: AdminPageProps) {
       if (propertyRes.error) throw propertyRes.error;
       if (vehicleRes.error) throw vehicleRes.error;
 
-      const propertyRows = (propertyRes.data ?? []) as Property[];
-      const vehicleRows = (vehicleRes.data ?? []) as Vehicle[];
+      const propertyRows = (propertyRes.data || []) as Property[];
+      const vehicleRows = (vehicleRes.data || []) as Vehicle[];
 
       const totalPropertyViews = propertyRows.reduce(
         (sum, item) => sum + (typeof item.views === 'number' ? item.views : 0),
@@ -190,14 +192,14 @@ export default function AdminPage({ onNavigate }: AdminPageProps) {
         const { data, error } = await q;
 
         if (error) throw error;
-        setProperties((data ?? []) as Property[]);
+        setProperties((data || []) as Property[]);
       } else if (activeTab === 'vehicles') {
         let q = supabase.from('vehicles').select('*').order('created_at', { ascending: false });
         if (!isSuperAdmin) q = q.eq('user_id', user?.id || '');
         const { data, error } = await q;
 
         if (error) throw error;
-        setVehicles((data ?? []) as Vehicle[]);
+        setVehicles((data || []) as Vehicle[]);
       } else if (activeTab === 'inquiries') {
         if (!isSuperAdmin) {
           setInquiries([]);
@@ -210,7 +212,7 @@ export default function AdminPage({ onNavigate }: AdminPageProps) {
           .order('created_at', { ascending: false });
 
         if (error) throw error;
-        setInquiries((data ?? []) as Inquiry[]);
+        setInquiries((data || []) as Inquiry[]);
       } else if (activeTab === 'approvals') {
         if (!isSuperAdmin) return;
 
@@ -230,8 +232,8 @@ export default function AdminPage({ onNavigate }: AdminPageProps) {
         if (pRes.error) throw pRes.error;
         if (vRes.error) throw vRes.error;
 
-        setPendingProperties((pRes.data ?? []) as Property[]);
-        setPendingVehicles((vRes.data ?? []) as Vehicle[]);
+        setPendingProperties((pRes.data || []) as Property[]);
+        setPendingVehicles((vRes.data || []) as Vehicle[]);
       } else if (activeTab === 'users') {
         if (!isSuperAdmin) return;
 
@@ -241,7 +243,17 @@ export default function AdminPage({ onNavigate }: AdminPageProps) {
           .order('updated_at', { ascending: false });
 
         if (error) throw error;
-        setProfiles((data ?? []) as ProfileRow[]);
+
+        const normalizedProfiles = ((data || []) as Array<Record<string, unknown>>).map((item) => ({
+          user_id: String(item.user_id || ''),
+          email: item.email ? String(item.email) : null,
+          display_name: item.display_name ? String(item.display_name) : null,
+          phone: item.phone ? String(item.phone) : null,
+          role: item.role === 'super_admin' ? 'super_admin' : 'user',
+          updated_at: item.updated_at ? String(item.updated_at) : null,
+        })) as ProfileRow[];
+
+        setProfiles(normalizedProfiles);
       }
     } catch (error) {
       console.error('Error loading data:', error);
@@ -254,10 +266,7 @@ export default function AdminPage({ onNavigate }: AdminPageProps) {
     setSavingProfile(true);
     const { error } = await updateMyProfile({ display_name: myDisplayName, phone: myPhone });
     setSavingProfile(false);
-
-    if (error) {
-      alert(error.message);
-    }
+    if (error) alert(error.message);
   };
 
   const approveProperty = async (id: string) => {
@@ -300,10 +309,9 @@ export default function AdminPage({ onNavigate }: AdminPageProps) {
     }
   };
 
-  const updateUserProfile = async (row: ProfileRow, patch: ProfilePatch) => {
+  const updateUserProfile = async (row: ProfileRow, patch: ProfileUpdate) => {
     try {
       const { error } = await supabase.from('profiles').update(patch).eq('user_id', row.user_id);
-
       if (error) throw error;
       await loadData();
     } catch (e) {
@@ -332,7 +340,6 @@ export default function AdminPage({ onNavigate }: AdminPageProps) {
 
     try {
       const { error } = await supabase.from('vehicles').delete().eq('id', id);
-
       if (error) throw error;
       await loadData();
       await loadDashboardStats();
@@ -356,12 +363,12 @@ export default function AdminPage({ onNavigate }: AdminPageProps) {
     setShowForm(true);
   };
 
-  const handleFormClose = () => {
+  const handleFormClose = async () => {
     setShowForm(false);
     setEditingProperty(null);
     setEditingVehicle(null);
-    void loadData();
-    void loadDashboardStats();
+    await loadData();
+    await loadDashboardStats();
   };
 
   const handleUpdateInquiryStatus = async (id: string, status: string) => {
@@ -528,9 +535,7 @@ export default function AdminPage({ onNavigate }: AdminPageProps) {
                             <span className="flex h-6 w-6 items-center justify-center rounded-full bg-brand/10 text-xs font-semibold text-brand">
                               {index + 1}
                             </span>
-                            <div className="truncate font-medium text-gray-900">
-                              {property.title}
-                            </div>
+                            <div className="truncate font-medium text-gray-900">{property.title}</div>
                           </div>
                           <div className="mt-1 text-sm text-gray-500">
                             {property.city}
@@ -610,6 +615,20 @@ export default function AdminPage({ onNavigate }: AdminPageProps) {
                 Araç ({vehicles.length})
               </button>
 
+              <button
+                onClick={() => setActiveTab('bulk_import')}
+                className={`px-6 py-4 font-medium transition-colors ${
+                  activeTab === 'bulk_import'
+                    ? 'border-b-2 border-brand text-brand'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <span className="inline-flex items-center gap-2">
+                  <Upload className="h-4 w-4" />
+                  Toplu İlan Yükleme
+                </span>
+              </button>
+
               {isSuperAdmin && (
                 <>
                   <button
@@ -685,22 +704,42 @@ export default function AdminPage({ onNavigate }: AdminPageProps) {
               </div>
             )}
 
+            {activeTab === 'bulk_import' && (
+              <BulkPropertyImportPanel
+                onImported={async () => {
+                  await loadData();
+                  await loadDashboardStats();
+                  setActiveTab('properties');
+                }}
+              />
+            )}
+
             {activeTab === 'properties' && (
               <>
                 <div className="mb-6 flex items-center justify-between">
                   <h2 className="text-xl font-semibold text-gray-900">İlanlar</h2>
-                  <button
-                    onClick={() => {
-                      setFormType('property');
-                      setEditingProperty(null);
-                      setEditingVehicle(null);
-                      setShowForm(true);
-                    }}
-                    className="flex items-center gap-2 rounded-lg bg-cta px-4 py-2 text-white transition-colors hover:bg-cta-hover"
-                  >
-                    <Plus className="h-5 w-5" />
-                    Yeni İlan
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setActiveTab('bulk_import')}
+                      className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-emerald-700 transition-colors hover:bg-emerald-100"
+                    >
+                      <Upload className="h-5 w-5" />
+                      Excel ile Toplu Yükle
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setFormType('property');
+                        setEditingProperty(null);
+                        setEditingVehicle(null);
+                        setShowForm(true);
+                      }}
+                      className="flex items-center gap-2 rounded-lg bg-cta px-4 py-2 text-white transition-colors hover:bg-cta-hover"
+                    >
+                      <Plus className="h-5 w-5" />
+                      Yeni İlan
+                    </button>
+                  </div>
                 </div>
 
                 {loading ? (
@@ -1113,7 +1152,7 @@ export default function AdminPage({ onNavigate }: AdminPageProps) {
                               <input
                                 defaultValue={p.display_name || ''}
                                 onBlur={(e) =>
-                                  updateUserProfile(p, { display_name: e.target.value || null })
+                                  void updateUserProfile(p, { display_name: e.target.value || null })
                                 }
                                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                               />
@@ -1123,7 +1162,7 @@ export default function AdminPage({ onNavigate }: AdminPageProps) {
                               <input
                                 defaultValue={p.phone || ''}
                                 onBlur={(e) =>
-                                  updateUserProfile(p, { phone: e.target.value || null })
+                                  void updateUserProfile(p, { phone: e.target.value || null })
                                 }
                                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                               />
@@ -1133,8 +1172,8 @@ export default function AdminPage({ onNavigate }: AdminPageProps) {
                               <select
                                 defaultValue={p.role || 'user'}
                                 onChange={(e) =>
-                                  updateUserProfile(p, {
-                                    role: e.target.value as ProfileRole,
+                                  void updateUserProfile(p, {
+                                    role: e.target.value as UserRole,
                                   })
                                 }
                                 className="rounded-lg border border-gray-300 px-3 py-2 text-sm"

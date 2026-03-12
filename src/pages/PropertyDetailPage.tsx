@@ -24,11 +24,6 @@ interface PropertyDetailPageProps {
   onNavigate: (page: string, propertyId?: string) => void;
 }
 
-type PropertyWithMap = Property & {
-  latitude?: number | null;
-  longitude?: number | null;
-};
-
 const FAVORITES_STORAGE_KEY = 'varol_property_favorites';
 const VIEWED_STORAGE_KEY = 'varol_viewed_properties';
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
@@ -101,13 +96,13 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
       if (readError) throw readError;
 
       const currentViews =
-        currentRow && typeof (currentRow as { views?: number }).views === 'number'
-          ? (currentRow as { views: number }).views
+        currentRow && typeof (currentRow as any).views === 'number'
+          ? (currentRow as any).views
           : 0;
 
       const { error: updateError } = await supabase
         .from('properties')
-        .update({ views: currentViews + 1 })
+        .update({ views: currentViews + 1 } as any)
         .eq('id', propertyId);
 
       if (updateError) throw updateError;
@@ -147,7 +142,6 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
       await increaseViewCountOnce();
     } catch (error) {
       console.error('Error loading property:', error);
-      setProperty(null);
     } finally {
       setLoading(false);
     }
@@ -216,7 +210,7 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
       rented: { tr: 'Kiralandı', en: 'Rented' },
     };
 
-    return map[status]?.[language] ?? status;
+    return map[status]?.[language] ?? status.replace(/_/g, ' ');
   };
 
   const getStatusColor = (status: string) => {
@@ -246,7 +240,7 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
       commercial: { tr: 'Ticari', en: 'Commercial' },
     };
 
-    return map[type]?.[language] ?? type.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+    return map[type]?.[language] ?? type.replace(/_/g, ' ');
   };
 
   const getSchemaType = (type: string) => {
@@ -301,14 +295,7 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
   };
 
   const getOfferCategoryForSchema = (status: string) => {
-    const map: Record<string, string> = {
-      for_sale: language === 'tr' ? 'Satılık' : 'For Sale',
-      for_rent: language === 'tr' ? 'Kiralık' : 'For Rent',
-      sold: language === 'tr' ? 'Satıldı' : 'Sold',
-      rented: language === 'tr' ? 'Kiralandı' : 'Rented',
-    };
-
-    return map[status] || getStatusLabel(status);
+    return getStatusLabel(status);
   };
 
   const buildAbsoluteUrl = (path: string) => `${window.location.origin}${path}`;
@@ -427,14 +414,15 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
   const realEstateSchemaJson = useMemo(() => {
     if (!property) return null;
 
-    const row = property as PropertyWithMap;
-    const latitude = row.latitude;
-    const longitude = row.longitude;
+    const latitude = (property as any).latitude;
+    const longitude = (property as any).longitude;
     const images = Array.isArray(property.images) ? property.images.filter(Boolean) : [];
     const firstImage = images.length > 0 ? images[0] : undefined;
     const propertyUrl = `${window.location.origin}/properties/${property.id}`;
     const schemaType = getSchemaType(property.property_type);
-    const addressLocality = property.district ? `${property.district}, ${property.city}` : property.city;
+    const addressLocality = property.district
+      ? `${property.district}, ${property.city}`
+      : property.city;
 
     const floorSizeValue =
       typeof property.net_area === 'number' && property.net_area > 0
@@ -571,9 +559,8 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
 
   const images = property.images || [];
   const hasImages = images.length > 0;
-  const row = property as PropertyWithMap;
-  const latitude = row.latitude;
-  const longitude = row.longitude;
+  const latitude = (property as any).latitude;
+  const longitude = (property as any).longitude;
   const hasMap = typeof latitude === 'number' && typeof longitude === 'number';
 
   return (
@@ -595,11 +582,15 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
         <link rel="canonical" href={canonicalUrl} />
         {pageImage ? <meta property="og:image" content={pageImage} /> : null}
         {pageImage ? <meta name="twitter:image" content={pageImage} /> : null}
-        {realEstateSchemaJson ? <script type="application/ld+json">{realEstateSchemaJson}</script> : null}
-        {breadcrumbSchemaJson ? <script type="application/ld+json">{breadcrumbSchemaJson}</script> : null}
+        {realEstateSchemaJson ? (
+          <script type="application/ld+json">{realEstateSchemaJson}</script>
+        ) : null}
+        {breadcrumbSchemaJson ? (
+          <script type="application/ld+json">{breadcrumbSchemaJson}</script>
+        ) : null}
       </Helmet>
 
-      <div className="min-h-screen bg-gray-50 pb-12 pt-20">
+      <div className="min-h-screen bg-gray-50 pt-20 pb-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <button
             onClick={() => onNavigate('properties')}

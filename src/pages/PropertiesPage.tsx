@@ -42,11 +42,6 @@ type MapBoundsValue = {
   west: number;
 };
 
-type PropertyWithMap = Property & {
-  latitude?: number | null;
-  longitude?: number | null;
-};
-
 const FAVORITES_STORAGE_KEY = 'varol_property_favorites';
 
 const DEFAULT_FILTERS: FiltersState = {
@@ -71,7 +66,7 @@ export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
   const [showMap, setShowMap] = useState(true);
-  const [mapFilterEnabled, setMapFilterEnabled] = useState(true);
+  const [mapFilterEnabled, setMapFilterEnabled] = useState(false);
   const [mapBounds, setMapBounds] = useState<MapBoundsValue | null>(null);
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
   const [filters, setFilters] = useState<FiltersState>(DEFAULT_FILTERS);
@@ -160,7 +155,7 @@ export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          setFavoriteIds(parsed as string[]);
+          setFavoriteIds(parsed);
         }
       }
     } catch (error) {
@@ -257,9 +252,7 @@ export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
       } else if (filters.sortBy === 'area_desc') {
         query = query.order('area', { ascending: false });
       } else if (filters.sortBy === 'most_viewed') {
-        query = query
-          .order('views', { ascending: false })
-          .order('created_at', { ascending: false });
+        query = query.order('views', { ascending: false }).order('created_at', { ascending: false });
       }
 
       const { data, error } = await query;
@@ -282,13 +275,14 @@ export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
   const resetFilters = () => {
     setFilters(DEFAULT_FILTERS);
     setMapBounds(null);
-    setMapFilterEnabled(true);
+    setMapFilterEnabled(false);
   };
 
   const mappedProperties = useMemo(() => {
     return properties.filter((property) => {
-      const row = property as PropertyWithMap;
-      return typeof row.latitude === 'number' && typeof row.longitude === 'number';
+      const latitude = (property as any).latitude;
+      const longitude = (property as any).longitude;
+      return typeof latitude === 'number' && typeof longitude === 'number';
     });
   }, [properties]);
 
@@ -298,17 +292,18 @@ export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
     }
 
     return properties.filter((property) => {
-      const row = property as PropertyWithMap;
+      const latitude = (property as any).latitude;
+      const longitude = (property as any).longitude;
 
-      if (typeof row.latitude !== 'number' || typeof row.longitude !== 'number') {
+      if (typeof latitude !== 'number' || typeof longitude !== 'number') {
         return false;
       }
 
       return (
-        row.latitude <= mapBounds.north &&
-        row.latitude >= mapBounds.south &&
-        row.longitude <= mapBounds.east &&
-        row.longitude >= mapBounds.west
+        latitude <= mapBounds.north &&
+        latitude >= mapBounds.south &&
+        longitude <= mapBounds.east &&
+        longitude >= mapBounds.west
       );
     });
   }, [properties, showMap, mapFilterEnabled, mapBounds]);
@@ -383,8 +378,7 @@ export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
 
   const pageImage = useMemo(() => {
     const firstWithImage = visibleProperties.find(
-      (property) =>
-        Array.isArray(property.images) && property.images.length > 0 && Boolean(property.images[0])
+      (property) => Array.isArray(property.images) && property.images.length > 0 && property.images[0]
     );
     return firstWithImage?.images?.[0];
   }, [visibleProperties]);
@@ -569,9 +563,7 @@ export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
                     <option value="residence">{language === 'tr' ? 'Rezidans' : 'Residence'}</option>
                     <option value="duplex">{language === 'tr' ? 'Dubleks' : 'Duplex'}</option>
                     <option value="villa">{language === 'tr' ? 'Villa' : 'Villa'}</option>
-                    <option value="detached_house">
-                      {language === 'tr' ? 'Müstakil Ev' : 'Detached House'}
-                    </option>
+                    <option value="detached_house">{language === 'tr' ? 'Müstakil Ev' : 'Detached House'}</option>
                     <option value="land">{language === 'tr' ? 'Arsa' : 'Land'}</option>
                     <option value="field">{language === 'tr' ? 'Tarla' : 'Field'}</option>
                     <option value="farm">{language === 'tr' ? 'Çiftlik' : 'Farm'}</option>
@@ -688,17 +680,11 @@ export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
                     >
                       <option value="newest">{language === 'tr' ? 'En Yeni' : 'Newest'}</option>
                       <option value="oldest">{language === 'tr' ? 'En Eski' : 'Oldest'}</option>
-                      <option value="price_asc">
-                        {language === 'tr' ? 'Fiyat Artan' : 'Price Low to High'}
-                      </option>
-                      <option value="price_desc">
-                        {language === 'tr' ? 'Fiyat Azalan' : 'Price High to Low'}
-                      </option>
+                      <option value="price_asc">{language === 'tr' ? 'Fiyat Artan' : 'Price Low to High'}</option>
+                      <option value="price_desc">{language === 'tr' ? 'Fiyat Azalan' : 'Price High to Low'}</option>
                       <option value="area_asc">{language === 'tr' ? 'm² Artan' : 'Area Low to High'}</option>
                       <option value="area_desc">{language === 'tr' ? 'm² Azalan' : 'Area High to Low'}</option>
-                      <option value="most_viewed">
-                        {language === 'tr' ? 'En Çok Görüntülenen' : 'Most Viewed'}
-                      </option>
+                      <option value="most_viewed">{language === 'tr' ? 'En Çok Görüntülenen' : 'Most Viewed'}</option>
                     </select>
                   </div>
                 </div>

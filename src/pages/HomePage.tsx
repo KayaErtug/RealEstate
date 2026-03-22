@@ -3,8 +3,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   Search,
   Building2,
-  Users,
-  Award,
   ArrowRight,
   Home,
   TrendingUp,
@@ -12,6 +10,11 @@ import {
   ChevronLeft,
   ChevronRight,
   BookOpen,
+  Phone,
+  FolderKanban,
+  Car,
+  ChevronRight as CategoryChevronRight,
+  Info,
 } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { supabase } from "../lib/supabase";
@@ -34,6 +37,8 @@ interface BlogPost {
 
 const RECENTLY_VIEWED_STORAGE_KEY = "varol_viewed_properties";
 const FAVORITES_STORAGE_KEY = "varol_property_favorites";
+const HOME_SEARCH_STORAGE_KEY = "home_search";
+const PROPERTY_STATUS_FILTER_STORAGE_KEY = "property_status_filter";
 
 export default function HomePage({ onNavigate }: HomePageProps) {
   const { t, language } = useLanguage();
@@ -50,6 +55,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   const [guideLoading, setGuideLoading] = useState(true);
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchType, setSearchType] = useState<"all" | "for_sale" | "for_rent">("all");
   const [featuredSlideIndex, setFeaturedSlideIndex] = useState(0);
 
   useEffect(() => {
@@ -248,12 +254,37 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
   const handleSearch = () => {
     try {
-      localStorage.setItem("home_search", searchQuery.trim());
+      localStorage.setItem(HOME_SEARCH_STORAGE_KEY, searchQuery.trim());
+
+      if (searchType === "for_sale" || searchType === "for_rent") {
+        localStorage.setItem(PROPERTY_STATUS_FILTER_STORAGE_KEY, searchType);
+      } else {
+        localStorage.removeItem(PROPERTY_STATUS_FILTER_STORAGE_KEY);
+      }
     } catch {
       // ignore localStorage errors
     }
 
     onNavigate("properties");
+  };
+
+  const handleCategoryNavigate = (
+    page: string,
+    options?: { propertyStatus?: "for_sale" | "for_rent" }
+  ) => {
+    try {
+      localStorage.removeItem(HOME_SEARCH_STORAGE_KEY);
+
+      if (options?.propertyStatus) {
+        localStorage.setItem(PROPERTY_STATUS_FILTER_STORAGE_KEY, options.propertyStatus);
+      } else {
+        localStorage.removeItem(PROPERTY_STATUS_FILTER_STORAGE_KEY);
+      }
+    } catch {
+      // ignore localStorage errors
+    }
+
+    onNavigate(page);
   };
 
   const featuredCards = useMemo(
@@ -377,7 +408,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       url: window.location.origin,
       logo: `${window.location.origin}/logo_varol.png`,
       image: `${window.location.origin}/logo_varol.png`,
-      telephone: "+90 258 211 0718",
+      telephone: "+44 7355 612852",
       email: "info@varolgayrimenkul.com",
       address: {
         "@type": "PostalAddress",
@@ -606,6 +637,92 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     }).format(new Date(dateString));
   };
 
+  const categories = [
+    {
+      id: "for-sale",
+      title: language === "tr" ? "Satılık Gayrimenkul" : "Properties for Sale",
+      description:
+        language === "tr"
+          ? "Arsa, daire, müstakil ev ve ticari portföyleri inceleyin."
+          : "Browse land, apartments, detached homes and commercial listings.",
+      icon: Building2,
+      iconWrapperClass: "bg-emerald-100 text-emerald-700",
+      onClick: () =>
+        handleCategoryNavigate("properties", {
+          propertyStatus: "for_sale",
+        }),
+    },
+    {
+      id: "for-rent",
+      title: language === "tr" ? "Kiralık Gayrimenkul" : "Properties for Rent",
+      description:
+        language === "tr"
+          ? "Kiralık konut, iş yeri ve farklı seçeneklere hızlı erişin."
+          : "Quickly access rental homes, workplaces and other options.",
+      icon: Home,
+      iconWrapperClass: "bg-blue-100 text-blue-700",
+      onClick: () =>
+        handleCategoryNavigate("properties", {
+          propertyStatus: "for_rent",
+        }),
+    },
+    {
+      id: "vehicles",
+      title: language === "tr" ? "Araç İlanları" : "Vehicle Listings",
+      description:
+        language === "tr"
+          ? "Araç ilanlarını ayrı kategoride inceleyin."
+          : "Explore vehicle listings in a dedicated category.",
+      icon: Car,
+      iconWrapperClass: "bg-amber-100 text-amber-700",
+      onClick: () => handleCategoryNavigate("vehicles"),
+    },
+    {
+      id: "projects",
+      title: language === "tr" ? "Projeler" : "Projects",
+      description:
+        language === "tr"
+          ? "Devam eden ve planlanan projelerimizi görüntüleyin."
+          : "View our ongoing and planned projects.",
+      icon: FolderKanban,
+      iconWrapperClass: "bg-purple-100 text-purple-700",
+      onClick: () => handleCategoryNavigate("projects"),
+    },
+    {
+      id: "about",
+      title: language === "tr" ? "Hakkımızda" : "About Us",
+      description:
+        language === "tr"
+          ? "Firma geçmişimiz, vizyonumuz ve çalışma anlayışımız."
+          : "Our company background, vision and working approach.",
+      icon: Info,
+      iconWrapperClass: "bg-slate-100 text-slate-700",
+      onClick: () => handleCategoryNavigate("about"),
+    },
+    {
+      id: "guide",
+      title: language === "tr" ? "Blog" : "Blog",
+      description:
+        language === "tr"
+          ? "Gayrimenkul rehberi, analizler ve faydalı içerikler."
+          : "Real estate guides, insights and useful content.",
+      icon: BookOpen,
+      iconWrapperClass: "bg-cyan-100 text-cyan-700",
+      onClick: () => handleCategoryNavigate("guide"),
+    },
+    {
+      id: "contact",
+      title: language === "tr" ? "İletişim" : "Contact",
+      description:
+        language === "tr"
+          ? "Telefon, adres, WhatsApp ve hızlı ulaşım kanalları."
+          : "Phone, address, WhatsApp and quick contact channels.",
+      icon: Phone,
+      iconWrapperClass: "bg-rose-100 text-rose-700",
+      onClick: () => handleCategoryNavigate("contact"),
+    },
+  ];
+
   return (
     <>
       <Helmet>
@@ -644,97 +761,179 @@ export default function HomePage({ onNavigate }: HomePageProps) {
       </Helmet>
 
       <div className="min-h-screen bg-gray-50">
-        <section className="relative flex h-[450px] items-center justify-center text-white">
-          <img
-            src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c"
-            className="absolute inset-0 h-full w-full object-cover"
-            alt="Varol Gayrimenkul ana sayfa görseli"
-          />
+        <section className="relative overflow-hidden border-b border-gray-200 bg-white">
+          <div className="absolute inset-0 bg-gradient-to-br from-brand/5 via-white to-emerald-50" />
 
-          <div className="absolute inset-0 bg-black/60" />
+          <div className="relative mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
+            <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-stretch">
+              <div className="flex flex-col items-center justify-center text-center">
+                <div className="mb-4 inline-flex w-fit items-center rounded-full bg-brand/10 px-4 py-1.5 text-sm font-semibold text-brand">
+                  {language === "tr"
+                    ? "Denizli ve çevresinde güncel portföy"
+                    : "Updated portfolio in Denizli and nearby"}
+                </div>
 
-          <div className="relative z-10 max-w-3xl px-6 text-center">
-            <h1 className="mb-4 text-4xl font-bold md:text-5xl">
-              {t("home.heroTitle")}
-            </h1>
+                <h1 className="max-w-3xl text-center text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl lg:text-5xl">
+                  {language === "tr"
+                    ? "Gayrimenkul ve araç ilanlarına hızlıca ulaşın"
+                    : "Quickly access property and vehicle listings"}
+                </h1>
 
-            <p className="mb-8 text-lg opacity-90">{t("home.heroSubtitle")}</p>
+                <p className="mt-4 max-w-2xl text-center text-base leading-7 text-gray-600 sm:text-lg">
+                  {language === "tr"
+                    ? "Satılık, kiralık, araç ilanları, projeler ve iletişim kanallarına tek sayfadan hızlı erişin."
+                    : "Get fast access to sale listings, rentals, vehicle ads, projects and contact channels from one page."}
+                </p>
 
-            <div className="flex gap-2 rounded-xl bg-white p-3 shadow-xl">
-              <input
-                type="text"
-                placeholder={t("home.searchPlaceholder")}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="flex-1 rounded-lg px-4 py-3 text-gray-800 outline-none"
-              />
+                <div className="mt-6 w-full max-w-3xl rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                    <div className="flex overflow-hidden rounded-xl border border-gray-200">
+                      <button
+                        type="button"
+                        onClick={() => setSearchType("all")}
+                        className={`px-4 py-2 text-sm font-semibold transition ${
+                          searchType === "all"
+                            ? "bg-brand text-white"
+                            : "bg-white text-gray-600 hover:bg-gray-50"
+                        }`}
+                      >
+                        {language === "tr" ? "Tümü" : "All"}
+                      </button>
 
+                      <button
+                        type="button"
+                        onClick={() => setSearchType("for_sale")}
+                        className={`px-4 py-2 text-sm font-semibold transition ${
+                          searchType === "for_sale"
+                            ? "bg-brand text-white"
+                            : "bg-white text-gray-600 hover:bg-gray-50"
+                        }`}
+                      >
+                        {language === "tr" ? "Satılık" : "For Sale"}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setSearchType("for_rent")}
+                        className={`px-4 py-2 text-sm font-semibold transition ${
+                          searchType === "for_rent"
+                            ? "bg-brand text-white"
+                            : "bg-white text-gray-600 hover:bg-gray-50"
+                        }`}
+                      >
+                        {language === "tr" ? "Kiralık" : "For Rent"}
+                      </button>
+                    </div>
+
+                    <div className="flex flex-1 items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                      <Search className="h-5 w-5 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder={t("home.searchPlaceholder")}
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full bg-transparent text-gray-800 outline-none placeholder:text-gray-400"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleSearch}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand px-6 py-3 font-semibold text-white transition hover:opacity-95"
+                    >
+                      <Search size={18} />
+                      {t("home.search")}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-5 flex flex-wrap justify-center gap-3 text-sm text-gray-500">
+                  <span className="rounded-full bg-gray-100 px-3 py-1.5">
+                    {language === "tr" ? "Satılık ilanlar" : "For sale listings"}
+                  </span>
+                  <span className="rounded-full bg-gray-100 px-3 py-1.5">
+                    {language === "tr" ? "Kiralık portföy" : "Rental portfolio"}
+                  </span>
+                  <span className="rounded-full bg-gray-100 px-3 py-1.5">
+                    {language === "tr" ? "Araç ilanları" : "Vehicle listings"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
+                <div className="border-b border-gray-100 px-5 py-4 text-center">
+                  <h2 className="text-lg font-bold text-gray-900">
+                    {language === "tr" ? "Hızlı Kategoriler" : "Quick Categories"}
+                  </h2>
+                  <p className="mt-1 text-sm text-gray-500">
+                    {language === "tr"
+                      ? "Sahibinden benzeri hızlı giriş mantığıyla en çok kullanılan alanlar"
+                      : "Most-used sections with a fast-entry structure"}
+                  </p>
+                </div>
+
+                <div className="divide-y divide-gray-100">
+                  {categories.map((category) => {
+                    const Icon = category.icon;
+
+                    return (
+                      <button
+                        key={category.id}
+                        type="button"
+                        onClick={category.onClick}
+                        className="flex w-full items-center gap-4 px-4 py-4 text-left transition hover:bg-gray-50 sm:px-5"
+                      >
+                        <div
+                          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${category.iconWrapperClass}`}
+                        >
+                          <Icon className="h-5 w-5" />
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="text-base font-semibold text-gray-900">
+                            {category.title}
+                          </div>
+                          <div className="mt-1 line-clamp-1 text-sm text-gray-500">
+                            {category.description}
+                          </div>
+                        </div>
+
+                        <CategoryChevronRight className="h-5 w-5 shrink-0 text-gray-300" />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-7xl px-4 pb-16 pt-10 sm:px-6 lg:px-8">
+          <div className="mb-8 text-center">
+            <h2 className="text-2xl font-bold text-gray-900">
+              {language === "tr" ? "Öne Çıkan Gayrimenkuller" : "Featured Properties"}
+            </h2>
+            <p className="mt-1 text-sm text-gray-500">
+              {language === "tr"
+                ? "Seçili portföyleri büyük slider alanında keşfet."
+                : "Discover selected listings in the featured slider."}
+            </p>
+
+            <div className="mt-4 flex justify-center">
               <button
-                onClick={handleSearch}
-                className="flex items-center gap-2 rounded-lg bg-green-600 px-6 text-white hover:bg-green-700"
+                onClick={() => onNavigate("properties")}
+                className="flex items-center gap-2 text-green-600"
               >
-                <Search size={18} />
-                {t("home.search")}
+                {t("home.viewAll")}
+                <ArrowRight size={18} />
               </button>
             </div>
-          </div>
-        </section>
-
-        <section className="mx-auto grid max-w-7xl gap-10 px-6 py-16 md:grid-cols-3">
-          <div className="text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-              <Building2 className="text-green-600" />
-            </div>
-
-            <h2 className="text-lg font-semibold">{t("home.feature1.title")}</h2>
-            <p className="mt-2 text-gray-500">{t("home.feature1.desc")}</p>
-          </div>
-
-          <div className="text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-              <Users className="text-green-600" />
-            </div>
-
-            <h2 className="text-lg font-semibold">{t("home.feature2.title")}</h2>
-            <p className="mt-2 text-gray-500">{t("home.feature2.desc")}</p>
-          </div>
-
-          <div className="text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
-              <Award className="text-green-600" />
-            </div>
-
-            <h2 className="text-lg font-semibold">{t("home.feature3.title")}</h2>
-            <p className="mt-2 text-gray-500">{t("home.feature3.desc")}</p>
-          </div>
-        </section>
-
-        <section className="mx-auto max-w-7xl px-6 pb-16">
-          <div className="mb-8 flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">
-                {language === "tr" ? "Öne Çıkan İlanlar" : "Featured Listings"}
-              </h2>
-              <p className="mt-1 text-sm text-gray-500">
-                {language === "tr"
-                  ? "Seçili portföyleri büyük slider alanında keşfet."
-                  : "Discover selected listings in the featured slider."}
-              </p>
-            </div>
-
-            <button
-              onClick={() => onNavigate("properties")}
-              className="flex items-center gap-2 text-green-600"
-            >
-              {t("home.viewAll")}
-              <ArrowRight size={18} />
-            </button>
           </div>
 
           {loading ? (
             <div className="h-[470px] animate-pulse rounded-3xl bg-gray-200" />
           ) : sliderProperty ? (
-            <div className="overflow-hidden rounded-3xl bg-white shadow-xl">
+            <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-xl">
               <div className="grid grid-cols-1 lg:grid-cols-2">
                 <div className="relative h-[280px] lg:h-[470px]">
                   <img
@@ -887,7 +1086,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           )}
         </section>
 
-        <section className="mx-auto max-w-7xl px-6 pb-16">
+        <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
           <div className="mb-8 flex items-center justify-between">
             <h2 className="text-2xl font-bold">{t("home.featuredTitle")}</h2>
 
@@ -903,10 +1102,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           {loading ? (
             <div className="grid gap-6 md:grid-cols-3">
               {[1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="h-72 animate-pulse rounded-xl bg-gray-200"
-                />
+                <div key={i} className="h-72 animate-pulse rounded-xl bg-gray-200" />
               ))}
             </div>
           ) : featuredProperties.length > 0 ? (
@@ -919,7 +1115,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           )}
         </section>
 
-        <section className="mx-auto max-w-7xl px-6 pb-16">
+        <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
           <div className="mb-8 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100">
@@ -952,10 +1148,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           {popularLoading ? (
             <div className="grid gap-6 md:grid-cols-3">
               {[1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="h-72 animate-pulse rounded-xl bg-gray-200"
-                />
+                <div key={i} className="h-72 animate-pulse rounded-xl bg-gray-200" />
               ))}
             </div>
           ) : popularProperties.length > 0 ? (
@@ -970,7 +1163,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           )}
         </section>
 
-        <section className="mx-auto max-w-7xl px-6 pb-16">
+        <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
           <div className="mb-8 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100">
@@ -1003,10 +1196,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           {recentLoading ? (
             <div className="grid gap-6 md:grid-cols-3">
               {[1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="h-72 animate-pulse rounded-xl bg-gray-200"
-                />
+                <div key={i} className="h-72 animate-pulse rounded-xl bg-gray-200" />
               ))}
             </div>
           ) : recentProperties.length > 0 ? (
@@ -1021,9 +1211,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           )}
         </section>
 
-        <section className="mx-auto max-w-7xl px-6 pb-16">
-          <div className="mb-8 flex items-center justify-between">
-            <div className="flex items-center gap-3">
+        <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
+          <div className="mb-8 text-center">
+            <div className="flex items-center justify-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100">
                 <BookOpen className="h-5 w-5 text-blue-600" />
               </div>
@@ -1042,22 +1232,21 @@ export default function HomePage({ onNavigate }: HomePageProps) {
               </div>
             </div>
 
-            <button
-              onClick={() => onNavigate("guide")}
-              className="flex items-center gap-2 text-green-600"
-            >
-              {language === "tr" ? "Tümünü Gör" : "View All"}
-              <ArrowRight size={18} />
-            </button>
+            <div className="mt-4 flex justify-center">
+              <button
+                onClick={() => onNavigate("guide")}
+                className="flex items-center gap-2 text-green-600"
+              >
+                {language === "tr" ? "Tümünü Gör" : "View All"}
+                <ArrowRight size={18} />
+              </button>
+            </div>
           </div>
 
           {guideLoading ? (
             <div className="grid gap-6 md:grid-cols-3">
               {[1, 2, 3].map((i) => (
-                <div
-                  key={i}
-                  className="h-72 animate-pulse rounded-xl bg-gray-200"
-                />
+                <div key={i} className="h-72 animate-pulse rounded-xl bg-gray-200" />
               ))}
             </div>
           ) : guidePosts.length > 0 ? (
@@ -1118,9 +1307,9 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           )}
         </section>
 
-        <section className="mx-auto max-w-6xl px-6 pb-20">
+        <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6 lg:px-8">
           <div className="overflow-hidden rounded-xl bg-white shadow-lg">
-            <div className="border-b p-4 font-semibold">
+            <div className="border-b p-4 text-center font-semibold">
               {language === "tr" ? "Tanıtım Videomuz" : "Our Promo Video"}
             </div>
 

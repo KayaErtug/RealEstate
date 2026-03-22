@@ -2,33 +2,93 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://varolgayrimenkul.com/</loc>
-    <lastmod>2026-03-12T13:51:48.966Z</lastmod>
+    <lastmod>2026-03-19T21:12:39.340Z</lastmod>
     <changefreq>daily</changefreq>
     <priority>1.0</priority>
   </url>
   <url>
     <loc>https://varolgayrimenkul.com/properties</loc>
-    <lastmod>2026-03-12T13:51:48.966Z</lastmod>
+    <lastmod>2026-03-19T21:12:39.340Z</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.95</priority>
   </url>
   <url>
     <loc>https://varolgayrimenkul.com/vehicles</loc>
-    <lastmod>2026-03-12T13:51:48.966Z</lastmod>
+    <lastmod>2026-03-19T21:12:39.340Z</lastmod>
     <changefreq>daily</changefreq>
     <priority>0.90</priority>
   </url>
   <url>
     <loc>https://varolgayrimenkul.com/rehber</loc>
-    <lastmod>2026-03-12T13:51:48.966Z</lastmod>
+    <lastmod>2026-03-19T21:12:39.340Z</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.90</priority>
   </url>
   <url>
     <loc>https://varolgayrimenkul.com/contact</loc>
-    <lastmod>2026-03-12T13:51:48.966Z</lastmod>
+    <lastmod>2026-03-19T21:12:39.340Z</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.70</priority>
+  </url>
+  <url>
+    <loc>https://varolgayrimenkul.com/properties/6a76f353-b274-459d-a548-2faf8675689f</loc>
+    <lastmod>2026-03-19T19:03:52.834547+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://varolgayrimenkul.com/properties/d1e9d422-42d2-48dc-879d-92e00e21221a</loc>
+    <lastmod>2026-03-19T19:03:52.834547+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://varolgayrimenkul.com/properties/8bddb806-868c-4c11-b89f-51042cdaa081</loc>
+    <lastmod>2026-03-19T19:03:52.834547+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://varolgayrimenkul.com/properties/680b0b91-60be-4d2b-baba-4c93aa0f3e29</loc>
+    <lastmod>2026-03-19T19:03:52.834547+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://varolgayrimenkul.com/properties/e1759a38-925c-4f4c-9903-e2fce02c7b60</loc>
+    <lastmod>2026-03-19T19:03:52.834547+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://varolgayrimenkul.com/properties/e98e07ef-d4dc-4f6f-9d25-754c8b78a9f4</loc>
+    <lastmod>2026-03-19T19:03:52.834547+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://varolgayrimenkul.com/properties/95801515-3867-4f0c-ba5e-5b4819eaf775</loc>
+    <lastmod>2026-03-19T20:51:58.587168+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://varolgayrimenkul.com/properties/2111f6c2-3e90-4ca5-ad16-5d14e1376b79</loc>
+    <lastmod>2026-03-19T19:03:52.834547+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://varolgayrimenkul.com/properties/244b4372-41b0-4482-bb2e-682327a5b1e5</loc>
+    <lastmod>2026-03-19T19:03:52.834547+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+  <url>
+    <loc>https://varolgayrimenkul.com/properties/0239519d-4168-48db-8ba5-6e236e0f3b0e</loc>
+    <lastmod>2026-03-19T19:03:52.834547+00:00</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
   </url>
   <url>
     <loc>https://varolgayrimenkul.com/properties/fee68e07-2a48-409f-9154-49f8c363b249</loc>
@@ -37,14 +97,14 @@
     <priority>0.85</priority>
   </url>
   <url>
-    <loc>https://varolgayrimenkul.com/properties/76c13d08-27a8-427d-afc0-02ee768ed4dd</loc>
-    <lastmod>2026-03-12T05:28:42.164119+00:00</lastmod>
+    <loc>https://varolgayrimenkul.com/properties/1a3beb3e-0b51-478f-bc1b-7577e8b958f8</loc>
+    <lastmod>2026-03-19T10:14:52.021492+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
   </url>
   <url>
-    <loc>https://varolgayrimenkul.com/properties/1a3beb3e-0b51-478f-bc1b-7577e8b958f8</loc>
-    <lastmod>2026-03-12T07:37:02.986256+00:00</lastmod>
+    <loc>https://varolgayrimenkul.com/properties/76c13d08-27a8-427d-afc0-02ee768ed4dd</loc>
+    <lastmod>2026-03-13T17:04:05.569384+00:00</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.85</priority>
   </url>

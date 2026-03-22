@@ -107,8 +107,8 @@ export default function Footer({ onNavigate }: FooterProps) {
               <div className="flex items-start gap-2">
                 <Phone className="mt-0.5 h-4 w-4 shrink-0" />
                 <div className="space-y-1">
-                  <a href="tel:+902582110718" className="block transition-colors hover:text-white">
-                    +90 258 211 0718
+                  <a href="tel:+44 7355 612852" className="block transition-colors hover:text-white">
+                    +44 7355 612852
                   </a>
                   <a href="tel:+905323402036" className="block transition-colors hover:text-white">
                     +90 532 340 20 36

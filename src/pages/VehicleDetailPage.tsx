@@ -18,7 +18,7 @@ import { supabase } from '../lib/supabase';
 import type { Vehicle } from '../lib/database.types';
 import { useLanguage } from '../contexts/LanguageContext';
 
-const WHATSAPP_NUMBER = '902589110718';
+const WHATSAPP_NUMBER = '+44 7355 612852';
 
 interface VehicleDetailPageProps {
   vehicleId: string;

@@ -1,4 +1,3 @@
-// src/pages/PropertyDetailPage.tsx
 import { useEffect, useMemo, useState } from 'react';
 import {
   MapPin,
@@ -11,6 +10,7 @@ import {
   Heart,
   ChevronLeft,
   ChevronRight,
+  Phone,
 } from 'lucide-react';
 import { Map, Marker, InfoWindow, APIProvider } from '@vis.gl/react-google-maps';
 import { Helmet } from 'react-helmet-async';
@@ -376,7 +376,10 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
   }, [property]);
 
   const pageImage = useMemo(() => {
-    if (!property || !Array.isArray(property.images) || property.images.length === 0) return undefined;
+    if (!property || !Array.isArray(property.images) || property.images.length === 0) {
+      return undefined;
+    }
+
     return property.images[0];
   }, [property]);
 
@@ -593,6 +596,7 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
       <div className="min-h-screen bg-gray-50 pt-20 pb-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <button
+            type="button"
             onClick={() => onNavigate('properties')}
             className="mb-6 flex items-center text-gray-600 transition-colors hover:text-cta"
           >
@@ -600,83 +604,91 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
             {t('common.back')}
           </button>
 
-          <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-            <div>
-              <div className="relative aspect-video overflow-hidden rounded-2xl bg-gray-200 shadow-sm">
-                {hasImages ? (
-                  <>
-                    <img
-                      src={images[selectedImage]}
-                      alt={property.title}
-                      className="h-full w-full object-cover"
-                    />
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1.15fr_0.85fr]">
+            <div className="space-y-6">
+              <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
+                <div className="relative aspect-[16/10] overflow-hidden bg-gray-200">
+                  {hasImages ? (
+                    <>
+                      <img
+                        src={images[selectedImage]}
+                        alt={property.title}
+                        className="h-full w-full object-cover"
+                      />
 
-                    {images.length > 1 && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={goPrevImage}
-                          className="absolute left-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/60"
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
+
+                      <div className="absolute left-4 top-4 flex flex-wrap gap-2">
+                        <span
+                          className={`${getStatusColor(property.status)} rounded-full px-3 py-1 text-xs font-semibold text-white`}
                         >
-                          <ChevronLeft className="h-5 w-5" />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={goNextImage}
-                          className="absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-sm hover:bg-black/60"
-                        >
-                          <ChevronRight className="h-5 w-5" />
-                        </button>
-                      </>
-                    )}
-
-                    <div className="absolute left-3 top-3 flex gap-2">
-                      <span
-                        className={`${getStatusColor(property.status)} rounded-full px-3 py-1 text-xs font-semibold text-white`}
-                      >
-                        {getStatusLabel(property.status)}
-                      </span>
-
-                      {property.featured && (
-                        <span className="rounded-full bg-amber-500 px-3 py-1 text-xs font-semibold text-white">
-                          {language === 'tr' ? 'Öne Çıkan' : 'Featured'}
+                          {getStatusLabel(property.status)}
                         </span>
+
+                        {property.featured && (
+                          <span className="rounded-full bg-amber-500 px-3 py-1 text-xs font-semibold text-white">
+                            {language === 'tr' ? 'Öne Çıkan' : 'Featured'}
+                          </span>
+                        )}
+
+                        <span className="rounded-full bg-black/55 px-3 py-1 text-xs font-medium text-white backdrop-blur-sm">
+                          {selectedImage + 1} / {images.length}
+                        </span>
+                      </div>
+
+                      {images.length > 1 && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={goPrevImage}
+                            className="absolute left-4 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-gray-800 shadow-md transition hover:bg-white"
+                          >
+                            <ChevronLeft className="h-5 w-5" />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={goNextImage}
+                            className="absolute right-4 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-gray-800 shadow-md transition hover:bg-white"
+                          >
+                            <ChevronRight className="h-5 w-5" />
+                          </button>
+                        </>
                       )}
+                    </>
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-6xl text-gray-400">
+                      🏠
                     </div>
-                  </>
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-6xl text-gray-400">
-                    🏠
+                  )}
+                </div>
+
+                {hasImages && (
+                  <div className="grid grid-cols-4 gap-2 p-3 sm:grid-cols-5 lg:grid-cols-6">
+                    {images.map((img, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setSelectedImage(idx)}
+                        className={`aspect-square overflow-hidden rounded-xl border-2 transition ${
+                          selectedImage === idx
+                            ? 'border-cta shadow-sm'
+                            : 'border-transparent hover:border-gray-200'
+                        }`}
+                      >
+                        <img src={img} alt="" className="h-full w-full object-cover" />
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>
 
-              {hasImages && (
-                <div className="mt-4 grid grid-cols-4 gap-2 sm:grid-cols-5">
-                  {images.map((img, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => setSelectedImage(idx)}
-                      className={`aspect-square overflow-hidden rounded-xl border-2 transition-colors ${
-                        selectedImage === idx ? 'border-cta' : 'border-transparent'
-                      }`}
-                    >
-                      <img src={img} alt="" className="h-full w-full object-cover" />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-6">
-              <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+              <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
                 <div className="mb-4 flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={toggleFavorite}
-                    className={`flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition-colors ${
+                    className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition ${
                       isFavorite
                         ? 'border-red-200 bg-red-50 text-red-600'
                         : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
@@ -695,7 +707,7 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
                   <button
                     type="button"
                     onClick={shareOnWhatsApp}
-                    className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
+                    className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100"
                   >
                     <Share2 className="h-4 w-4" />
                     WhatsApp
@@ -704,87 +716,132 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
                   <button
                     type="button"
                     onClick={copyPropertyLink}
-                    className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100"
+                    className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
                   >
                     <Copy className="h-4 w-4" />
                     {language === 'tr' ? 'Linki Kopyala' : 'Copy Link'}
                   </button>
                 </div>
 
-                <h1 className="mb-2 text-3xl font-bold text-gray-900">{property.title}</h1>
+                <h1 className="text-3xl font-bold leading-tight text-gray-900">{property.title}</h1>
 
-                <p className="text-2xl font-semibold text-cta">
+                <div className="mt-3 text-3xl font-bold text-cta">
                   {formatPrice(property.price, property.currency)}
-                </p>
-
-                <div className="mt-3 flex items-center text-gray-500">
-                  <MapPin className="mr-1 h-5 w-5" />
-                  <span>
-                    {property.city}
-                    {property.district ? `, ${property.district}` : ''}
-                  </span>
                 </div>
 
-                {property.location && (
-                  <div className="mt-2 text-sm text-gray-500">{property.location}</div>
-                )}
+                <div className="mt-4 flex items-start gap-2 text-gray-500">
+                  <MapPin className="mt-0.5 h-5 w-5 shrink-0" />
+                  <div>
+                    <div>
+                      {property.city}
+                      {property.district ? `, ${property.district}` : ''}
+                    </div>
+                    {property.location ? (
+                      <div className="mt-1 text-sm text-gray-400">{property.location}</div>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <div className="rounded-2xl bg-gray-50 px-4 py-3">
+                    <div className="text-xs text-gray-400">
+                      {language === 'tr' ? 'Tür' : 'Type'}
+                    </div>
+                    <div className="mt-1 font-medium text-gray-800">
+                      {getPropertyTypeLabel(property.property_type)}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl bg-gray-50 px-4 py-3">
+                    <div className="text-xs text-gray-400">m²</div>
+                    <div className="mt-1 font-medium text-gray-800">{property.area}</div>
+                  </div>
+
+                  <div className="rounded-2xl bg-gray-50 px-4 py-3">
+                    <div className="text-xs text-gray-400">
+                      {language === 'tr' ? 'Oda' : 'Rooms'}
+                    </div>
+                    <div className="mt-1 font-medium text-gray-800">
+                      {property.rooms > 0 ? property.rooms : '-'}
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl bg-gray-50 px-4 py-3">
+                    <div className="text-xs text-gray-400">
+                      {language === 'tr' ? 'Banyo' : 'Bath'}
+                    </div>
+                    <div className="mt-1 font-medium text-gray-800">
+                      {property.bathrooms > 0 ? property.bathrooms : '-'}
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-                <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
-                  <div className="flex items-center text-gray-700">
-                    <Home className="mr-3 h-5 w-5 text-cta" />
+              <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
+                <h2 className="mb-4 text-xl font-bold text-gray-900">{t('detail.description')}</h2>
+                <p className="whitespace-pre-line leading-7 text-gray-600">{property.description}</p>
+              </div>
+
+              <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
+                <h2 className="mb-4 text-xl font-bold text-gray-900">
+                  {language === 'tr' ? 'Temel Özellikler' : 'Key Features'}
+                </h2>
+
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="flex items-center gap-3 text-gray-700">
+                    <Home className="h-5 w-5 text-cta" />
                     <span>{getPropertyTypeLabel(property.property_type)}</span>
                   </div>
 
-                  <div className="flex items-center text-gray-700">
-                    <Maximize className="mr-3 h-5 w-5 text-cta" />
+                  <div className="flex items-center gap-3 text-gray-700">
+                    <Maximize className="h-5 w-5 text-cta" />
                     <span>{property.area} m²</span>
                   </div>
 
-                  <div className="flex items-center text-gray-700">
-                    <Bath className="mr-3 h-5 w-5 text-cta" />
-                    <span>{property.bathrooms > 0 ? property.bathrooms : '-'}</span>
+                  <div className="flex items-center gap-3 text-gray-700">
+                    <Home className="h-5 w-5 text-cta" />
+                    <span>
+                      {language === 'tr' ? 'Oda' : 'Rooms'}:{' '}
+                      {property.rooms > 0 ? property.rooms : '-'}
+                    </span>
                   </div>
 
-                  <div className="flex items-center text-gray-700">
-                    <Home className="mr-3 h-5 w-5 text-cta" />
-                    <span>{property.rooms > 0 ? property.rooms : '-'}</span>
+                  <div className="flex items-center gap-3 text-gray-700">
+                    <Bath className="h-5 w-5 text-cta" />
+                    <span>
+                      {language === 'tr' ? 'Banyo' : 'Bath'}:{' '}
+                      {property.bathrooms > 0 ? property.bathrooms : '-'}
+                    </span>
                   </div>
 
                   {property.net_area ? (
-                    <div className="flex items-center text-gray-700">
-                      <Maximize className="mr-3 h-5 w-5 text-cta" />
+                    <div className="flex items-center gap-3 text-gray-700">
+                      <Maximize className="h-5 w-5 text-cta" />
                       <span>
-                        {language === 'tr' ? 'Net' : 'Net'} {property.net_area} m²
+                        {language === 'tr' ? 'Net Alan' : 'Net Area'}: {property.net_area} m²
                       </span>
                     </div>
                   ) : null}
 
                   {property.gross_area ? (
-                    <div className="flex items-center text-gray-700">
-                      <Maximize className="mr-3 h-5 w-5 text-cta" />
+                    <div className="flex items-center gap-3 text-gray-700">
+                      <Maximize className="h-5 w-5 text-cta" />
                       <span>
-                        {language === 'tr' ? 'Brüt' : 'Gross'} {property.gross_area} m²
+                        {language === 'tr' ? 'Brüt Alan' : 'Gross Area'}: {property.gross_area} m²
                       </span>
                     </div>
                   ) : null}
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-                <h2 className="mb-3 text-xl font-bold">{t('detail.description')}</h2>
-                <p className="whitespace-pre-line text-gray-600">{property.description}</p>
-              </div>
-
               {hasMap && GOOGLE_MAPS_API_KEY && (
-                <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+                <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
                   <h2 className="mb-4 text-xl font-bold text-gray-900">
                     {language === 'tr' ? 'Konum' : 'Location'}
                   </h2>
 
                   <div className="overflow-hidden rounded-2xl border border-gray-200">
-                    <div className="h-[320px] w-full">
+                    <div className="h-[340px] w-full">
                       <APIProvider apiKey={GOOGLE_MAPS_API_KEY} language="tr" region="TR">
                         <Map
                           defaultCenter={{ lat: latitude, lng: longitude }}
@@ -806,30 +863,80 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
                   </div>
                 </div>
               )}
+            </div>
+
+            <div className="space-y-6 lg:sticky lg:top-24 lg:self-start">
+              <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
+                <div className="mb-4 text-sm font-medium text-gray-500">
+                  {language === 'tr' ? 'İlan Durumu' : 'Listing Status'}
+                </div>
+
+                <div
+                  className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold text-white ${getStatusColor(
+                    property.status
+                  )}`}
+                >
+                  {getStatusLabel(property.status)}
+                </div>
+
+                <div className="mt-5 text-3xl font-bold text-cta">
+                  {formatPrice(property.price, property.currency)}
+                </div>
+
+                <div className="mt-5 space-y-3">
+                  <button
+                    type="button"
+                    onClick={shareOnWhatsApp}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white transition hover:bg-emerald-700"
+                  >
+                    <Share2 className="h-4 w-4" />
+                    WhatsApp ile Sor
+                  </button>
+
+                  {property.contact_phone ? (
+                    <a
+                      href={`tel:${property.contact_phone}`}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-brand bg-brand/5 px-4 py-3 font-semibold text-brand transition hover:bg-brand/10"
+                    >
+                      <Phone className="h-4 w-4" />
+                      {language === 'tr' ? 'Hemen Ara' : 'Call Now'}
+                    </a>
+                  ) : null}
+
+                  <button
+                    type="button"
+                    onClick={copyPropertyLink}
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 font-medium text-gray-700 transition hover:bg-gray-100"
+                  >
+                    <Copy className="h-4 w-4" />
+                    {language === 'tr' ? 'İlan Linkini Kopyala' : 'Copy Listing Link'}
+                  </button>
+                </div>
+              </div>
 
               {(property.contact_name || property.contact_phone) && (
-                <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+                <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
                   <h2 className="mb-4 text-xl font-bold text-gray-900">
                     {language === 'tr' ? 'İletişim Bilgileri' : 'Contact Information'}
                   </h2>
 
-                  {property.contact_name && (
-                    <div className="mb-2 text-gray-700">
+                  {property.contact_name ? (
+                    <div className="mb-3 text-gray-700">
                       <span className="font-medium">
                         {language === 'tr' ? 'Yetkili: ' : 'Contact: '}
                       </span>
                       {property.contact_name}
                     </div>
-                  )}
+                  ) : null}
 
-                  {property.contact_phone && (
-                    <a
-                      href={`tel:${property.contact_phone}`}
-                      className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-white hover:bg-emerald-700"
-                    >
-                      <span>{property.contact_phone}</span>
-                    </a>
-                  )}
+                  {property.contact_phone ? (
+                    <div className="text-gray-700">
+                      <span className="font-medium">
+                        {language === 'tr' ? 'Telefon: ' : 'Phone: '}
+                      </span>
+                      {property.contact_phone}
+                    </div>
+                  ) : null}
                 </div>
               )}
             </div>

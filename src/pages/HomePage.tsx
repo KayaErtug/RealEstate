@@ -15,6 +15,10 @@ import {
   Car,
   ChevronRight as CategoryChevronRight,
   Info,
+  ShieldCheck,
+  BadgeCheck,
+  MapPin,
+  Sparkles,
 } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { supabase } from "../lib/supabase";
@@ -22,6 +26,10 @@ import type { Property } from "../lib/database.types";
 import PropertyCard from "../components/PropertyCard";
 import { useLanguage } from "../contexts/LanguageContext";
 import HomeVehiclesShowcase from "../components/home/HomeVehiclesShowcase";
+import {
+  getPropertyTypeLabel,
+  getStatusLabel,
+} from "../lib/propertyTranslations";
 
 interface HomePageProps {
   onNavigate: (page: string, propertyId?: string) => void;
@@ -343,6 +351,193 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     sliderProperty && sliderProperty.images && sliderProperty.images.length > 0
       ? sliderProperty.images[0]
       : "https://images.unsplash.com/photo-1600585154340-be6161a56a0c";
+
+  const sliderHighlights = useMemo(() => {
+    if (!sliderProperty) return [];
+
+    const items: string[] = [];
+
+    items.push(getPropertyTypeLabel(sliderProperty.property_type, language));
+    items.push(`${sliderProperty.area} m²`);
+
+    if (sliderProperty.rooms > 0) {
+      items.push(
+        language === "tr"
+          ? `${sliderProperty.rooms} Oda`
+          : `${sliderProperty.rooms} Rooms`
+      );
+    }
+
+    if (sliderProperty.bathrooms > 0) {
+      items.push(
+        language === "tr"
+          ? `${sliderProperty.bathrooms} Banyo`
+          : `${sliderProperty.bathrooms} Bathrooms`
+      );
+    }
+
+    if (sliderProperty.parking) {
+      items.push(language === "tr" ? "Otopark" : "Parking");
+    }
+
+    if (sliderProperty.elevator) {
+      items.push(language === "tr" ? "Asansör" : "Elevator");
+    }
+
+    if (sliderProperty.in_site) {
+      items.push(language === "tr" ? "Site İçinde" : "In Complex");
+    }
+
+    if (sliderProperty.pool) {
+      items.push(language === "tr" ? "Havuz" : "Pool");
+    }
+
+    if (sliderProperty.city) {
+      items.push(
+        sliderProperty.district
+          ? `${sliderProperty.city}, ${sliderProperty.district}`
+          : sliderProperty.city
+      );
+    }
+
+    return items.slice(0, 6);
+  }, [sliderProperty, language]);
+
+  const heroStats = useMemo(() => {
+    const featuredCount = featuredProperties.length;
+    const popularCount = popularProperties.length;
+    const guideCount = guidePosts.length;
+
+    return [
+      {
+        id: "featured",
+        icon: BadgeCheck,
+        title: language === "tr" ? "Seçili Portföy" : "Selected Portfolio",
+        value:
+          featuredCount > 0
+            ? `${featuredCount}+`
+            : language === "tr"
+            ? "Güncel"
+            : "Updated",
+      },
+      {
+        id: "popular",
+        icon: ShieldCheck,
+        title: language === "tr" ? "Güven Veren Vitrin" : "Trusted Showcase",
+        value:
+          popularCount > 0
+            ? language === "tr"
+              ? "Popüler İlanlar"
+              : "Popular Listings"
+            : language === "tr"
+            ? "Aktif"
+            : "Active",
+      },
+      {
+        id: "guide",
+        icon: Sparkles,
+        title: language === "tr" ? "Rehber İçerikler" : "Guide Content",
+        value:
+          guideCount > 0
+            ? `${guideCount}+`
+            : language === "tr"
+            ? "Yeni"
+            : "Fresh",
+      },
+    ];
+  }, [featuredProperties.length, popularProperties.length, guidePosts.length, language]);
+
+  const trustItems = useMemo(() => {
+    return [
+      {
+        id: "portfolio",
+        icon: Building2,
+        title: language === "tr" ? "Güncel Portföy" : "Updated Portfolio",
+        description:
+          language === "tr"
+            ? "Satılık ve kiralık portföyler düzenli güncellenir."
+            : "For sale and rental portfolios are updated regularly.",
+      },
+      {
+        id: "location",
+        icon: MapPin,
+        title: language === "tr" ? "Denizli Odaklı" : "Focused on Denizli",
+        description:
+          language === "tr"
+            ? "Denizli ve çevresindeki fırsatlara hızlı erişim."
+            : "Fast access to opportunities in Denizli and nearby areas.",
+      },
+      {
+        id: "contact",
+        icon: Phone,
+        title: language === "tr" ? "Hızlı İletişim" : "Fast Contact",
+        description:
+          language === "tr"
+            ? "WhatsApp ve telefon ile doğrudan ulaşım."
+            : "Direct access via WhatsApp and phone.",
+      },
+    ];
+  }, [language]);
+
+  const sliderSummary = useMemo(() => {
+    if (!sliderProperty) return "";
+
+    if (language === "tr") {
+      const parts: string[] = [];
+
+      parts.push(
+        `${sliderProperty.city}${
+          sliderProperty.district ? ` / ${sliderProperty.district}` : ""
+        } lokasyonunda`
+      );
+
+      parts.push(
+        `${getStatusLabel(sliderProperty.status, language).toLowerCase()} ${getPropertyTypeLabel(
+          sliderProperty.property_type,
+          language
+        ).toLowerCase()}`
+      );
+
+      if (sliderProperty.rooms > 0) {
+        parts.push(`${sliderProperty.rooms} oda`);
+      }
+
+      if (sliderProperty.area > 0) {
+        parts.push(`${sliderProperty.area} m²`);
+      }
+
+      parts.push("fırsatını inceleyin.");
+
+      return parts.join(" ");
+    }
+
+    const parts: string[] = [];
+
+    parts.push(
+      `Explore this ${getStatusLabel(sliderProperty.status, language).toLowerCase()} ${getPropertyTypeLabel(
+        sliderProperty.property_type,
+        language
+      ).toLowerCase()}`
+    );
+
+    if (sliderProperty.city) {
+      parts.push(
+        `in ${sliderProperty.city}${
+          sliderProperty.district ? ` / ${sliderProperty.district}` : ""
+        }.`
+      );
+    }
+
+    if (sliderProperty.rooms > 0) {
+      parts.push(`${sliderProperty.rooms} rooms.`);
+    }
+
+    if (sliderProperty.area > 0) {
+      parts.push(`${sliderProperty.area} m².`);
+    }
+
+    return parts.join(" ");
+  }, [sliderProperty, language]);
 
   const goPrevSlide = () => {
     if (featuredProperties.length <= 1) return;
@@ -776,15 +971,34 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
                 <h1 className="max-w-3xl text-center text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl lg:text-5xl">
                   {language === "tr"
-                    ? "Gayrimenkul ve araç ilanlarına hızlıca ulaşın"
-                    : "Quickly access property and vehicle listings"}
+                    ? "Gayrimenkul ve araç ilanlarına güvenle, hızlıca ulaşın"
+                    : "Access property and vehicle listings quickly and confidently"}
                 </h1>
 
                 <p className="mt-4 max-w-2xl text-center text-base leading-7 text-gray-600 sm:text-lg">
                   {language === "tr"
-                    ? "Satılık, kiralık, araç ilanları, projeler ve iletişim kanallarına tek sayfadan hızlı erişin."
-                    : "Get fast access to sale listings, rentals, vehicle ads, projects and contact channels from one page."}
+                    ? "Satılık, kiralık, araç ilanları, projeler ve iletişim kanallarına tek sayfadan hızlı erişin. Denizli odaklı profesyonel vitrin yapısıyla fırsatları kolayca keşfedin."
+                    : "Get fast access to sale listings, rentals, vehicle ads, projects and contact channels from one page. Discover opportunities with a professional showcase focused on Denizli."}
                 </p>
+
+                <div className="mt-6 grid w-full max-w-3xl gap-3 sm:grid-cols-3">
+                  {heroStats.map((item) => {
+                    const Icon = item.icon;
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="rounded-2xl border border-gray-200 bg-white px-4 py-4 text-left shadow-sm"
+                      >
+                        <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <div className="text-sm font-medium text-gray-500">{item.title}</div>
+                        <div className="mt-1 text-lg font-bold text-gray-900">{item.value}</div>
+                      </div>
+                    );
+                  })}
+                </div>
 
                 <div className="mt-6 w-full max-w-3xl rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -909,6 +1123,29 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </div>
         </section>
 
+        <section className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
+          <div className="grid gap-4 md:grid-cols-3">
+            {trustItems.map((item) => {
+              const Icon = item.icon;
+
+              return (
+                <div
+                  key={item.id}
+                  className="rounded-2xl border border-gray-200 bg-white px-5 py-5 shadow-sm"
+                >
+                  <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-700">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <div className="text-base font-bold text-gray-900">{item.title}</div>
+                  <div className="mt-1 text-sm leading-6 text-gray-600">
+                    {item.description}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
         <section className="mx-auto max-w-7xl px-4 pb-16 pt-10 sm:px-6 lg:px-8">
           <div className="mb-8 text-center">
             <h2 className="text-2xl font-bold text-gray-900">
@@ -947,21 +1184,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
                   <div className="absolute left-4 top-4 flex gap-2">
                     <span className="rounded-full bg-emerald-600 px-3 py-1 text-xs font-semibold text-white">
-                      {sliderProperty.status === "for_sale"
-                        ? language === "tr"
-                          ? "Satılık"
-                          : "For Sale"
-                        : sliderProperty.status === "for_rent"
-                          ? language === "tr"
-                            ? "Kiralık"
-                            : "For Rent"
-                          : sliderProperty.status === "sold"
-                            ? language === "tr"
-                              ? "Satıldı"
-                              : "Sold"
-                            : language === "tr"
-                              ? "Kiralandı"
-                              : "Rented"}
+                      {getStatusLabel(sliderProperty.status, language)}
                     </span>
 
                     {sliderProperty.featured && (
@@ -1012,13 +1235,30 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                       }).format(sliderProperty.price)}
                     </p>
 
+                    <div className="mb-4 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-900">
+                      {sliderSummary}
+                    </div>
+
+                    {sliderHighlights.length > 0 && (
+                      <div className="mb-5 flex flex-wrap gap-2">
+                        {sliderHighlights.map((item) => (
+                          <span
+                            key={item}
+                            className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-700"
+                          >
+                            {item}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
                     <div className="mb-5 grid grid-cols-2 gap-3 text-sm text-gray-600 sm:grid-cols-3">
                       <div className="rounded-2xl bg-gray-50 px-4 py-3">
                         <div className="text-xs text-gray-400">
                           {language === "tr" ? "Tür" : "Type"}
                         </div>
-                        <div className="mt-1 font-medium capitalize text-gray-800">
-                          {sliderProperty.property_type.replace(/_/g, " ")}
+                        <div className="mt-1 font-medium text-gray-800">
+                          {getPropertyTypeLabel(sliderProperty.property_type, language)}
                         </div>
                       </div>
 
@@ -1285,8 +1525,8 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                       {post.seo_description && post.seo_description.trim()
                         ? post.seo_description
                         : language === "tr"
-                          ? "Gayrimenkul rehber yazısını okumak için tıklayın."
-                          : "Click to read the real estate guide article."}
+                        ? "Gayrimenkul rehber yazısını okumak için tıklayın."
+                        : "Click to read the real estate guide article."}
                     </p>
 
                     <div className="mt-5 flex items-center justify-between border-t border-gray-100 pt-4">

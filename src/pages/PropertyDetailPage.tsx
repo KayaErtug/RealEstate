@@ -1,9 +1,7 @@
+// src/pages/PropertyDetailPage.tsx
 import { useEffect, useMemo, useState } from 'react';
 import {
   MapPin,
-  Home,
-  Bath,
-  Maximize,
   ArrowLeft,
   Share2,
   Copy,
@@ -11,6 +9,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Phone,
+  Sparkles,
+  TrendingUp,
+  Building2,
 } from 'lucide-react';
 import { Map, Marker, InfoWindow, APIProvider } from '@vis.gl/react-google-maps';
 import { Helmet } from 'react-helmet-async';
@@ -18,11 +19,25 @@ import { supabase } from '../lib/supabase';
 import type { Property } from '../lib/database.types';
 import { useLanguage } from '../contexts/LanguageContext';
 import PropertyCard from '../components/PropertyCard';
+import {
+  getDeedStatusLabel,
+  getFrontageLabel,
+  getHeatingLabel,
+  getPropertyTypeLabel,
+  getStatusColor,
+  getStatusLabel,
+  getUsageStatusLabel,
+} from '../lib/propertyTranslations';
 
 interface PropertyDetailPageProps {
   propertyId: string;
   onNavigate: (page: string, propertyId?: string) => void;
 }
+
+type PropertyWithCoords = Property & {
+  latitude?: number | null;
+  longitude?: number | null;
+};
 
 const FAVORITES_STORAGE_KEY = 'varol_property_favorites';
 const VIEWED_STORAGE_KEY = 'varol_viewed_properties';
@@ -202,47 +217,6 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
     }).format(price);
   };
 
-  const getStatusLabel = (status: string) => {
-    const map: Record<string, { tr: string; en: string }> = {
-      for_sale: { tr: 'Satılık', en: 'For Sale' },
-      for_rent: { tr: 'Kiralık', en: 'For Rent' },
-      sold: { tr: 'Satıldı', en: 'Sold' },
-      rented: { tr: 'Kiralandı', en: 'Rented' },
-    };
-
-    return map[status]?.[language] ?? status.replace(/_/g, ' ');
-  };
-
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      for_sale: 'bg-emerald-600',
-      for_rent: 'bg-sky-600',
-      sold: 'bg-gray-600',
-      rented: 'bg-zinc-600',
-    };
-
-    return colors[status] || 'bg-gray-600';
-  };
-
-  const getPropertyTypeLabel = (type: string) => {
-    const map: Record<string, { tr: string; en: string }> = {
-      apartment: { tr: 'Daire', en: 'Apartment' },
-      residence: { tr: 'Rezidans', en: 'Residence' },
-      duplex: { tr: 'Dubleks', en: 'Duplex' },
-      villa: { tr: 'Villa', en: 'Villa' },
-      detached_house: { tr: 'Müstakil Ev', en: 'Detached House' },
-      land: { tr: 'Arsa', en: 'Land' },
-      field: { tr: 'Tarla', en: 'Field' },
-      farm: { tr: 'Çiftlik', en: 'Farm' },
-      office: { tr: 'Ofis', en: 'Office' },
-      shop: { tr: 'Dükkan', en: 'Shop' },
-      building: { tr: 'Bina', en: 'Building' },
-      commercial: { tr: 'Ticari', en: 'Commercial' },
-    };
-
-    return map[type]?.[language] ?? type.replace(/_/g, ' ');
-  };
-
   const getSchemaType = (type: string) => {
     const map: Record<string, string> = {
       apartment: 'Apartment',
@@ -295,7 +269,7 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
   };
 
   const getOfferCategoryForSchema = (status: string) => {
-    return getStatusLabel(status);
+    return getStatusLabel(status, language);
   };
 
   const buildAbsoluteUrl = (path: string) => `${window.location.origin}${path}`;
@@ -352,6 +326,145 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
     setSelectedImage((prev) => (prev === property.images.length - 1 ? 0 : prev + 1));
   };
 
+  const quickFacts = useMemo(() => {
+    if (!property) return [];
+
+    const facts: string[] = [];
+
+    facts.push(`${property.area} m²`);
+    facts.push(getPropertyTypeLabel(property.property_type, language));
+
+    if (property.rooms > 0) {
+      facts.push(
+        language === 'tr' ? `${property.rooms} Oda` : `${property.rooms} Rooms`
+      );
+    }
+
+    if (property.bathrooms > 0) {
+      facts.push(
+        language === 'tr' ? `${property.bathrooms} Banyo` : `${property.bathrooms} Bathrooms`
+      );
+    }
+
+    if (property.city) {
+      facts.push(property.district ? `${property.city}, ${property.district}` : property.city);
+    }
+
+    return facts.slice(0, 5);
+  }, [property, language]);
+
+  const highlightFeatures = useMemo(() => {
+    if (!property) return [];
+
+    const features: string[] = [];
+
+    if (property.area >= 120) {
+      features.push(language === 'tr' ? 'Geniş metrekare avantajı' : 'Spacious floor area');
+    }
+
+    if (property.rooms >= 3) {
+      features.push(language === 'tr' ? 'Aile yaşamına uygun plan' : 'Suitable layout for family living');
+    }
+
+    if (property.parking) {
+      features.push(language === 'tr' ? 'Otopark imkanı' : 'Parking available');
+    }
+
+    if (property.elevator) {
+      features.push(language === 'tr' ? 'Asansörlü yapı' : 'Elevator access');
+    }
+
+    if (property.in_site) {
+      features.push(language === 'tr' ? 'Site içerisinde' : 'Located in a residential complex');
+    }
+
+    if (property.pool) {
+      features.push(language === 'tr' ? 'Havuz avantajı' : 'Pool feature');
+    }
+
+    if (property.security) {
+      features.push(language === 'tr' ? 'Güvenlik desteği' : 'Security support');
+    }
+
+    if (property.garden) {
+      features.push(language === 'tr' ? 'Bahçe kullanımı' : 'Garden usage');
+    }
+
+    if (property.balcony) {
+      features.push(language === 'tr' ? 'Balkonlu yaşam alanı' : 'Balcony living space');
+    }
+
+    if (property.frontage) {
+      features.push(
+        language === 'tr'
+          ? `${getFrontageLabel(property.frontage, language)} cephe`
+          : `${getFrontageLabel(property.frontage, language)} frontage`
+      );
+    }
+
+    if (property.heating) {
+      features.push(
+        language === 'tr'
+          ? `${getHeatingLabel(property.heating, language)} ısıtma`
+          : `${getHeatingLabel(property.heating, language)} heating`
+      );
+    }
+
+    return features.slice(0, 6);
+  }, [property, language]);
+
+  const investmentNote = useMemo(() => {
+    if (!property) return '';
+
+    const notes: string[] = [];
+
+    if (language === 'tr') {
+      if (property.status === 'for_sale') {
+        notes.push('Satılık portföyde yer alması nedeniyle oturum ve yatırım açısından değerlendirilebilir.');
+      }
+
+      if (property.status === 'for_rent') {
+        notes.push('Kiralık portföyde yer alması nedeniyle kullanım kolaylığı ve lokasyon avantajı öne çıkabilir.');
+      }
+
+      if (property.city) {
+        notes.push(`${property.city}${property.district ? ` / ${property.district}` : ''} lokasyonu ilan değerini destekler.`);
+      }
+
+      if (property.featured) {
+        notes.push('Öne çıkan ilan olarak vitrine alınmıştır.');
+      }
+
+      if (typeof property.views === 'number' && property.views > 50) {
+        notes.push('İlan yüksek görüntülenme alarak dikkat çekmektedir.');
+      }
+    } else {
+      if (property.status === 'for_sale') {
+        notes.push('Being listed for sale makes it worth evaluating for both living and investment purposes.');
+      }
+
+      if (property.status === 'for_rent') {
+        notes.push('Being listed for rent may offer practical usage and location advantages.');
+      }
+
+      if (property.city) {
+        notes.push(
+          `${property.city}${property.district ? ` / ${property.district}` : ''} location supports listing value.`
+        );
+      }
+
+      if (property.featured) {
+        notes.push('This listing is highlighted as a featured portfolio item.');
+      }
+
+      if (typeof property.views === 'number' && property.views > 50) {
+        notes.push('The listing is attracting strong attention with higher view counts.');
+      }
+    }
+
+    return notes.join(' ');
+  }, [property, language]);
+
   const seoTitle = useMemo(() => {
     if (!property) {
       return 'Varol Gayrimenkul';
@@ -365,9 +478,35 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
       return 'Varol Gayrimenkul satılık ve kiralık ilanları.';
     }
 
-    return `${property.city}${property.district ? `, ${property.district}` : ''} bölgesinde ${
-      property.area
-    } m² ${getStatusLabel(property.status)} ${getPropertyTypeLabel(property.property_type)} ilanı.`;
+    const parts: string[] = [];
+
+    if (language === 'tr') {
+      parts.push(
+        `${property.city}${property.district ? `, ${property.district}` : ''} bölgesinde`
+      );
+      parts.push(`${property.area} m²`);
+      parts.push(getStatusLabel(property.status, language));
+      parts.push(getPropertyTypeLabel(property.property_type, language));
+      if (property.rooms > 0) parts.push(`${property.rooms} oda`);
+      if (property.bathrooms > 0) parts.push(`${property.bathrooms} banyo`);
+      if (property.featured) parts.push('öne çıkan ilan');
+      parts.push('detaylarını inceleyin.');
+    } else {
+      parts.push(
+        `Explore this ${property.area} m² ${getStatusLabel(property.status, language).toLowerCase()} ${getPropertyTypeLabel(
+          property.property_type,
+          language
+        ).toLowerCase()}`
+      );
+      if (property.city) {
+        parts.push(`in ${property.city}${property.district ? `, ${property.district}` : ''}.`);
+      }
+      if (property.rooms > 0) parts.push(`${property.rooms} rooms.`);
+      if (property.bathrooms > 0) parts.push(`${property.bathrooms} bathrooms.`);
+      if (property.featured) parts.push('Featured portfolio listing.');
+    }
+
+    return parts.join(' ');
   }, [property, language]);
 
   const canonicalUrl = useMemo(() => {
@@ -417,8 +556,8 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
   const realEstateSchemaJson = useMemo(() => {
     if (!property) return null;
 
-    const latitude = (property as any).latitude;
-    const longitude = (property as any).longitude;
+    const latitude = (property as PropertyWithCoords).latitude;
+    const longitude = (property as PropertyWithCoords).longitude;
     const images = Array.isArray(property.images) ? property.images.filter(Boolean) : [];
     const firstImage = images.length > 0 ? images[0] : undefined;
     const propertyUrl = `${window.location.origin}/properties/${property.id}`;
@@ -461,12 +600,12 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
         {
           '@type': 'PropertyValue',
           name: language === 'tr' ? 'İlan Durumu' : 'Listing Status',
-          value: getStatusLabel(property.status),
+          value: getStatusLabel(property.status, language),
         },
         {
           '@type': 'PropertyValue',
           name: language === 'tr' ? 'Emlak Türü' : 'Property Type',
-          value: getPropertyTypeLabel(property.property_type),
+          value: getPropertyTypeLabel(property.property_type, language),
         },
         {
           '@type': 'PropertyValue',
@@ -488,6 +627,42 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
                 '@type': 'PropertyValue',
                 name: language === 'tr' ? 'Brüt Kullanım Alanı' : 'Gross Usable Area',
                 value: `${property.gross_area} m²`,
+              },
+            ]
+          : []),
+        ...(property.heating
+          ? [
+              {
+                '@type': 'PropertyValue',
+                name: language === 'tr' ? 'Isıtma' : 'Heating',
+                value: getHeatingLabel(property.heating, language),
+              },
+            ]
+          : []),
+        ...(property.frontage
+          ? [
+              {
+                '@type': 'PropertyValue',
+                name: language === 'tr' ? 'Cephe' : 'Frontage',
+                value: getFrontageLabel(property.frontage, language),
+              },
+            ]
+          : []),
+        ...(property.deed_status
+          ? [
+              {
+                '@type': 'PropertyValue',
+                name: language === 'tr' ? 'Tapu Durumu' : 'Title Deed Status',
+                value: getDeedStatusLabel(property.deed_status, language),
+              },
+            ]
+          : []),
+        ...(property.usage_status
+          ? [
+              {
+                '@type': 'PropertyValue',
+                name: language === 'tr' ? 'Kullanım Durumu' : 'Usage Status',
+                value: getUsageStatusLabel(property.usage_status, language),
               },
             ]
           : []),
@@ -552,6 +727,184 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
     return JSON.stringify(listing);
   }, [property, language]);
 
+  const details = useMemo(() => {
+    if (!property) return [];
+
+    return [
+      {
+        label: language === 'tr' ? 'İlan Durumu' : 'Listing Status',
+        value: getStatusLabel(property.status, language),
+      },
+      {
+        label: language === 'tr' ? 'Emlak Türü' : 'Property Type',
+        value: getPropertyTypeLabel(property.property_type, language),
+      },
+      {
+        label: language === 'tr' ? 'Alan' : 'Area',
+        value: `${property.area} m²`,
+      },
+      {
+        label: language === 'tr' ? 'Net Alan' : 'Net Area',
+        value: property.net_area ? `${property.net_area} m²` : '-',
+      },
+      {
+        label: language === 'tr' ? 'Brüt Alan' : 'Gross Area',
+        value: property.gross_area ? `${property.gross_area} m²` : '-',
+      },
+      {
+        label: language === 'tr' ? 'Oda Sayısı' : 'Rooms',
+        value: property.rooms > 0 ? String(property.rooms) : '-',
+      },
+      {
+        label: language === 'tr' ? 'Banyo Sayısı' : 'Bathrooms',
+        value: property.bathrooms > 0 ? String(property.bathrooms) : '-',
+      },
+      {
+        label: language === 'tr' ? 'Kat' : 'Floor',
+        value:
+          typeof property.floor === 'number' && property.floor >= 0
+            ? String(property.floor)
+            : '-',
+      },
+      {
+        label: language === 'tr' ? 'Toplam Kat' : 'Total Floors',
+        value:
+          typeof property.total_floors === 'number' && property.total_floors >= 0
+            ? String(property.total_floors)
+            : '-',
+      },
+      {
+        label: language === 'tr' ? 'Bina Yaşı' : 'Building Age',
+        value:
+          typeof property.building_age === 'number' && property.building_age >= 0
+            ? String(property.building_age)
+            : '-',
+      },
+      {
+        label: language === 'tr' ? 'Isıtma' : 'Heating',
+        value: getHeatingLabel(property.heating, language),
+      },
+      {
+        label: language === 'tr' ? 'Aidat' : 'Dues',
+        value:
+          typeof property.dues === 'number' && property.dues > 0
+            ? formatPrice(property.dues, property.currency)
+            : '-',
+      },
+      {
+        label: language === 'tr' ? 'Cephe' : 'Frontage',
+        value: getFrontageLabel(property.frontage, language),
+      },
+      {
+        label: language === 'tr' ? 'Tapu Durumu' : 'Title Deed Status',
+        value: getDeedStatusLabel(property.deed_status, language),
+      },
+      {
+        label: language === 'tr' ? 'Kullanım Durumu' : 'Usage Status',
+        value: getUsageStatusLabel(property.usage_status, language),
+      },
+      {
+        label: language === 'tr' ? 'Site İçinde' : 'In Complex',
+        value:
+          language === 'tr'
+            ? property.in_site
+              ? 'Evet'
+              : 'Hayır'
+            : property.in_site
+            ? 'Yes'
+            : 'No',
+      },
+      {
+        label: language === 'tr' ? 'Site Adı' : 'Site Name',
+        value: property.site_name || '-',
+      },
+      {
+        label: language === 'tr' ? 'Balkon' : 'Balcony',
+        value:
+          language === 'tr'
+            ? property.balcony
+              ? 'Var'
+              : 'Yok'
+            : property.balcony
+            ? 'Yes'
+            : 'No',
+      },
+      {
+        label: language === 'tr' ? 'Balkon Sayısı' : 'Balcony Count',
+        value:
+          typeof property.balcony_count === 'number' && property.balcony_count > 0
+            ? String(property.balcony_count)
+            : '-',
+      },
+      {
+        label: language === 'tr' ? 'Asansör' : 'Elevator',
+        value:
+          language === 'tr'
+            ? property.elevator
+              ? 'Var'
+              : 'Yok'
+            : property.elevator
+            ? 'Yes'
+            : 'No',
+      },
+      {
+        label: language === 'tr' ? 'Otopark' : 'Parking',
+        value:
+          language === 'tr'
+            ? property.parking
+              ? 'Var'
+              : 'Yok'
+            : property.parking
+            ? 'Yes'
+            : 'No',
+      },
+      {
+        label: language === 'tr' ? 'Eşyalı' : 'Furnished',
+        value:
+          language === 'tr'
+            ? property.furnished
+              ? 'Evet'
+              : 'Hayır'
+            : property.furnished
+            ? 'Yes'
+            : 'No',
+      },
+      {
+        label: language === 'tr' ? 'Havuz' : 'Pool',
+        value:
+          language === 'tr'
+            ? property.pool
+              ? 'Var'
+              : 'Yok'
+            : property.pool
+            ? 'Yes'
+            : 'No',
+      },
+      {
+        label: language === 'tr' ? 'Güvenlik' : 'Security',
+        value:
+          language === 'tr'
+            ? property.security
+              ? 'Var'
+              : 'Yok'
+            : property.security
+            ? 'Yes'
+            : 'No',
+      },
+      {
+        label: language === 'tr' ? 'Bahçe' : 'Garden',
+        value:
+          language === 'tr'
+            ? property.garden
+              ? 'Var'
+              : 'Yok'
+            : property.garden
+            ? 'Yes'
+            : 'No',
+      },
+    ];
+  }, [property, language]);
+
   if (loading) {
     return <div className="pt-32 text-center">{t('common.loading')}</div>;
   }
@@ -562,8 +915,8 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
 
   const images = property.images || [];
   const hasImages = images.length > 0;
-  const latitude = (property as any).latitude;
-  const longitude = (property as any).longitude;
+  const latitude = (property as PropertyWithCoords).latitude;
+  const longitude = (property as PropertyWithCoords).longitude;
   const hasMap = typeof latitude === 'number' && typeof longitude === 'number';
 
   return (
@@ -593,7 +946,7 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
         ) : null}
       </Helmet>
 
-      <div className="min-h-screen bg-gray-50 pt-20 pb-12">
+      <div className="min-h-screen bg-gray-50 pt-20 pb-28 lg:pb-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <button
             type="button"
@@ -622,7 +975,7 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
                         <span
                           className={`${getStatusColor(property.status)} rounded-full px-3 py-1 text-xs font-semibold text-white`}
                         >
-                          {getStatusLabel(property.status)}
+                          {getStatusLabel(property.status, language)}
                         </span>
 
                         {property.featured && (
@@ -700,8 +1053,8 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
                         ? 'Favorilerde'
                         : 'Favorilere Ekle'
                       : isFavorite
-                        ? 'Saved'
-                        : 'Save'}
+                      ? 'Saved'
+                      : 'Save'}
                   </button>
 
                   <button
@@ -742,13 +1095,26 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
                   </div>
                 </div>
 
+                {quickFacts.length > 0 && (
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    {quickFacts.map((fact) => (
+                      <span
+                        key={fact}
+                        className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700"
+                      >
+                        {fact}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
                 <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
                   <div className="rounded-2xl bg-gray-50 px-4 py-3">
                     <div className="text-xs text-gray-400">
                       {language === 'tr' ? 'Tür' : 'Type'}
                     </div>
                     <div className="mt-1 font-medium text-gray-800">
-                      {getPropertyTypeLabel(property.property_type)}
+                      {getPropertyTypeLabel(property.property_type, language)}
                     </div>
                   </div>
 
@@ -777,6 +1143,28 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
                 </div>
               </div>
 
+              {highlightFeatures.length > 0 && (
+                <div className="rounded-3xl border border-emerald-100 bg-white p-6 shadow-sm">
+                  <div className="mb-4 flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-emerald-600" />
+                    <h2 className="text-xl font-bold text-gray-900">
+                      {language === 'tr' ? 'Öne Çıkan Özellikler' : 'Highlighted Features'}
+                    </h2>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {highlightFeatures.map((feature) => (
+                      <div
+                        key={feature}
+                        className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"
+                      >
+                        {feature}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
                 <h2 className="mb-4 text-xl font-bold text-gray-900">{t('detail.description')}</h2>
                 <p className="whitespace-pre-line leading-7 text-gray-600">{property.description}</p>
@@ -788,49 +1176,15 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
                 </h2>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div className="flex items-center gap-3 text-gray-700">
-                    <Home className="h-5 w-5 text-cta" />
-                    <span>{getPropertyTypeLabel(property.property_type)}</span>
-                  </div>
-
-                  <div className="flex items-center gap-3 text-gray-700">
-                    <Maximize className="h-5 w-5 text-cta" />
-                    <span>{property.area} m²</span>
-                  </div>
-
-                  <div className="flex items-center gap-3 text-gray-700">
-                    <Home className="h-5 w-5 text-cta" />
-                    <span>
-                      {language === 'tr' ? 'Oda' : 'Rooms'}:{' '}
-                      {property.rooms > 0 ? property.rooms : '-'}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-3 text-gray-700">
-                    <Bath className="h-5 w-5 text-cta" />
-                    <span>
-                      {language === 'tr' ? 'Banyo' : 'Bath'}:{' '}
-                      {property.bathrooms > 0 ? property.bathrooms : '-'}
-                    </span>
-                  </div>
-
-                  {property.net_area ? (
-                    <div className="flex items-center gap-3 text-gray-700">
-                      <Maximize className="h-5 w-5 text-cta" />
-                      <span>
-                        {language === 'tr' ? 'Net Alan' : 'Net Area'}: {property.net_area} m²
-                      </span>
+                  {details.map((item) => (
+                    <div
+                      key={item.label}
+                      className="flex items-center justify-between gap-4 rounded-2xl bg-gray-50 px-4 py-3"
+                    >
+                      <span className="text-sm text-gray-500">{item.label}</span>
+                      <span className="text-right font-medium text-gray-800">{item.value}</span>
                     </div>
-                  ) : null}
-
-                  {property.gross_area ? (
-                    <div className="flex items-center gap-3 text-gray-700">
-                      <Maximize className="h-5 w-5 text-cta" />
-                      <span>
-                        {language === 'tr' ? 'Brüt Alan' : 'Gross Area'}: {property.gross_area} m²
-                      </span>
-                    </div>
-                  ) : null}
+                  ))}
                 </div>
               </div>
 
@@ -876,7 +1230,7 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
                     property.status
                   )}`}
                 >
-                  {getStatusLabel(property.status)}
+                  {getStatusLabel(property.status, language)}
                 </div>
 
                 <div className="mt-5 text-3xl font-bold text-cta">
@@ -911,6 +1265,64 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
                     <Copy className="h-4 w-4" />
                     {language === 'tr' ? 'İlan Linkini Kopyala' : 'Copy Listing Link'}
                   </button>
+                </div>
+              </div>
+
+              {investmentNote ? (
+                <div className="rounded-3xl border border-amber-200 bg-white p-6 shadow-sm">
+                  <div className="mb-3 flex items-center gap-2">
+                    <TrendingUp className="h-5 w-5 text-amber-600" />
+                    <h2 className="text-xl font-bold text-gray-900">
+                      {language === 'tr' ? 'Yatırım / Değer Notu' : 'Investment / Value Note'}
+                    </h2>
+                  </div>
+
+                  <p className="text-sm leading-6 text-gray-600">{investmentNote}</p>
+                </div>
+              ) : null}
+
+              <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
+                <div className="mb-3 flex items-center gap-2">
+                  <Building2 className="h-5 w-5 text-slate-700" />
+                  <h2 className="text-xl font-bold text-gray-900">
+                    {language === 'tr' ? 'Hızlı Bilgi' : 'Quick Info'}
+                  </h2>
+                </div>
+
+                <div className="space-y-3 text-sm text-gray-700">
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-gray-500">{language === 'tr' ? 'Tür' : 'Type'}</span>
+                    <span className="text-right font-medium">
+                      {getPropertyTypeLabel(property.property_type, language)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-gray-500">{language === 'tr' ? 'Durum' : 'Status'}</span>
+                    <span className="text-right font-medium">
+                      {getStatusLabel(property.status, language)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-gray-500">{language === 'tr' ? 'Konum' : 'Location'}</span>
+                    <span className="text-right font-medium">
+                      {property.city}
+                      {property.district ? `, ${property.district}` : ''}
+                    </span>
+                  </div>
+
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-gray-500">{language === 'tr' ? 'İlan Görseli' : 'Photos'}</span>
+                    <span className="text-right font-medium">{images.length}</span>
+                  </div>
+
+                  <div className="flex items-start justify-between gap-3">
+                    <span className="text-gray-500">{language === 'tr' ? 'Görüntülenme' : 'Views'}</span>
+                    <span className="text-right font-medium">
+                      {typeof property.views === 'number' ? property.views : 0}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -974,6 +1386,37 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
             )}
           </div>
         </div>
+
+        {property && (
+          <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white/95 p-3 shadow-2xl backdrop-blur lg:hidden">
+            <div className="mx-auto flex max-w-7xl gap-3">
+              <button
+                type="button"
+                onClick={shareOnWhatsApp}
+                className="flex-1 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-700"
+              >
+                WhatsApp
+              </button>
+
+              {property.contact_phone ? (
+                <a
+                  href={`tel:${property.contact_phone}`}
+                  className="flex-1 rounded-xl bg-slate-900 px-4 py-3 text-center text-sm font-bold text-white transition hover:bg-slate-800"
+                >
+                  {language === 'tr' ? 'Ara' : 'Call'}
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  onClick={copyPropertyLink}
+                  className="flex-1 rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white transition hover:bg-slate-800"
+                >
+                  {language === 'tr' ? 'Link Kopyala' : 'Copy Link'}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

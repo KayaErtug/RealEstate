@@ -14,6 +14,10 @@ import type { Property } from "../lib/database.types";
 import PropertyCard from "../components/PropertyCard";
 import PropertyMap from "../components/PropertyMap";
 import { useLanguage } from "../contexts/LanguageContext";
+import {
+  getPropertyTypeLabel,
+  getStatusLabel,
+} from "../lib/propertyTranslations";
 
 interface PropertiesPageProps {
   onNavigate: (page: string, propertyId?: string) => void;
@@ -66,19 +70,58 @@ const DEFAULT_FILTERS: FiltersState = {
   featuredOnly: false,
 };
 
+const PROPERTY_TYPE_OPTIONS = [
+  "apartment",
+  "residence",
+  "duplex",
+  "penthouse",
+  "villa",
+  "detached_house",
+  "bungalow",
+  "mansion",
+  "land",
+  "field",
+  "farm",
+  "commercial",
+  "shop",
+  "office",
+  "plaza",
+  "warehouse",
+  "factory",
+  "building",
+  "hotel",
+  "hostel",
+  "touristic_facility",
+  "gas_station",
+  "restaurant",
+  "cafe",
+  "clinic",
+  "hospital",
+  "school",
+  "dormitory",
+  "parking_lot",
+] as const;
+
+type PropertyWithCoords = Property & {
+  latitude?: number | null;
+  longitude?: number | null;
+};
+
 export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
   const { language, t } = useLanguage();
 
   const [properties, setProperties] = useState<Property[]>([]);
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
-  const [showMap, setShowMap] = useState(true);
+  const [showMap, setShowMap] = useState(false);
   const [mapFilterEnabled, setMapFilterEnabled] = useState(false);
   const [mapBounds, setMapBounds] = useState<MapBoundsValue | null>(null);
   const [favoriteIds, setFavoriteIds] = useState<string[]>([]);
   const [filters, setFilters] = useState<FiltersState>(DEFAULT_FILTERS);
+  const [selectedPropertyId, setSelectedPropertyId] = useState<string | null>(null);
 
   const hasInitializedFromUrl = useRef(false);
+  const propertyCardRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => {
     loadFavorites();
@@ -120,6 +163,15 @@ export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
     updateUrlFromFilters(filters);
     void loadProperties();
   }, [filters]);
+
+  useEffect(() => {
+    if (!selectedPropertyId) return;
+
+    const existsInVisibleList = properties.some((property) => property.id === selectedPropertyId);
+    if (!existsInVisibleList) {
+      setSelectedPropertyId(null);
+    }
+  }, [properties, selectedPropertyId]);
 
   const getFiltersFromUrl = (): Partial<FiltersState> => {
     const params = new URLSearchParams(window.location.search);
@@ -227,6 +279,124 @@ export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
     });
   };
 
+  const getPropertyQualityScore = (property: Property): number => {
+    const item = property as PropertyWithCoords;
+    let score = 0;
+
+    const titleLength = property.title?.trim().length ?? 0;
+    const descriptionLength = property.description?.trim().length ?? 0;
+    const imageCount = Array.isArray(property.images)
+      ? property.images.filter(Boolean).length
+      : 0;
+    const hasCoords =
+      typeof item.latitude === "number" && typeof item.longitude === "number";
+    const hasDistrict = Boolean(property.district?.trim());
+    const hasLocation = Boolean(property.location?.trim());
+    const hasContact = Boolean(
+      property.contact_name?.trim() || property.contact_phone?.trim()
+    );
+    const hasCorePrice = typeof property.price === "number" && property.price > 0;
+    const hasCoreArea = typeof property.area === "number" && property.area > 0;
+    const hasRooms = typeof property.rooms === "number" && property.rooms > 0;
+    const hasBathrooms =
+      typeof property.bathrooms === "number" && property.bathrooms > 0;
+    const hasHeating = Boolean(property.heating);
+    const hasDeedStatus = Boolean(property.deed_status);
+    const hasUsageStatus = Boolean(property.usage_status);
+    const hasFrontage = Boolean(property.frontage);
+
+    if (titleLength >= 10) score += 10;
+    if (titleLength >= 20) score += 6;
+
+    if (descriptionLength >= 50) score += 12;
+    if (descriptionLength >= 120) score += 8;
+    if (descriptionLength >= 250) score += 6;
+
+    if (hasCorePrice) score += 10;
+    if (hasCoreArea) score += 10;
+    if (hasDistrict) score += 4;
+    if (hasLocation) score += 6;
+    if (hasCoords) score += 10;
+    if (hasContact) score += 4;
+
+    if (imageCount >= 1) score += 4;
+    if (imageCount >= 3) score += 6;
+    if (imageCount >= 5) score += 6;
+    if (imageCount >= 8) score += 4;
+
+    if (hasRooms) score += 4;
+    if (hasBathrooms) score += 4;
+    if (hasHeating) score += 2;
+    if (hasDeedStatus) score += 2;
+    if (hasUsageStatus) score += 2;
+    if (hasFrontage) score += 2;
+
+    return Math.min(score, 100);
+  };
+
+  const sortProperties = (items: Property[]): Property[] => {
+    const sorted = [...items];
+
+    sorted.sort((a, b) => {
+      if (a.featured && !b.featured) return -1;
+      if (!a.featured && b.featured) return 1;
+
+      const qualityA = getPropertyQualityScore(a);
+      const qualityB = getPropertyQualityScore(b);
+
+      switch (filters.sortBy) {
+        case "oldest": {
+          const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return aTime - bTime;
+        }
+
+        case "price_asc":
+          return a.price - b.price;
+
+        case "price_desc":
+          return b.price - a.price;
+
+        case "area_asc":
+          return a.area - b.area;
+
+        case "area_desc":
+          return b.area - a.area;
+
+        case "most_viewed": {
+          const aViews = typeof a.views === "number" ? a.views : 0;
+          const bViews = typeof b.views === "number" ? b.views : 0;
+
+          if (bViews !== aViews) return bViews - aViews;
+
+          const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+          return bTime - aTime;
+        }
+
+        case "quality_desc":
+          if (qualityB !== qualityA) return qualityB - qualityA;
+          break;
+
+        case "newest":
+        default: {
+          const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+          const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+          if (bTime !== aTime) return bTime - aTime;
+          break;
+        }
+      }
+
+      if (qualityB !== qualityA) return qualityB - qualityA;
+
+      const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return bTime - aTime;
+    });
+
+    return sorted;
+  };
+
   const loadProperties = async () => {
     try {
       setLoading(true);
@@ -277,7 +447,11 @@ export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
       }
 
       if (filters.rooms !== "all") {
-        query = query.eq("rooms", Number(filters.rooms));
+        if (filters.rooms === "5") {
+          query = query.gte("rooms", 5);
+        } else {
+          query = query.eq("rooms", Number(filters.rooms));
+        }
       }
 
       if (filters.featuredOnly) {
@@ -300,13 +474,26 @@ export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
         query = query
           .order("views", { ascending: false })
           .order("created_at", { ascending: false });
+      } else if (filters.sortBy === "quality_desc") {
+        query = query.order("featured", { ascending: false }).order("created_at", {
+          ascending: false,
+        });
       }
 
       const { data, error } = await query;
 
       if (error) throw error;
 
-      setProperties((data ?? []) as Property[]);
+      const typedData = (data ?? []) as Property[];
+      const sortedData = sortProperties(typedData);
+      setProperties(sortedData);
+
+      if (selectedPropertyId) {
+        const stillExists = typedData.some((item) => item.id === selectedPropertyId);
+        if (!stillExists) {
+          setSelectedPropertyId(null);
+        }
+      }
     } catch (error) {
       console.error("Error loading properties:", error);
       setProperties([]);
@@ -333,12 +520,13 @@ export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
     setFilters(DEFAULT_FILTERS);
     setMapBounds(null);
     setMapFilterEnabled(false);
+    setSelectedPropertyId(null);
   };
 
   const mappedProperties = useMemo(() => {
     return properties.filter((property) => {
-      const latitude = (property as Property & { latitude?: number }).latitude;
-      const longitude = (property as Property & { longitude?: number }).longitude;
+      const latitude = (property as PropertyWithCoords).latitude;
+      const longitude = (property as PropertyWithCoords).longitude;
 
       return typeof latitude === "number" && typeof longitude === "number";
     });
@@ -350,8 +538,8 @@ export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
     }
 
     return properties.filter((property) => {
-      const latitude = (property as Property & { latitude?: number }).latitude;
-      const longitude = (property as Property & { longitude?: number }).longitude;
+      const latitude = (property as PropertyWithCoords).latitude;
+      const longitude = (property as PropertyWithCoords).longitude;
 
       if (typeof latitude !== "number" || typeof longitude !== "number") {
         return false;
@@ -365,6 +553,18 @@ export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
       );
     });
   }, [properties, showMap, mapFilterEnabled, mapBounds]);
+
+  useEffect(() => {
+    if (!selectedPropertyId || !showMap) return;
+
+    const node = propertyCardRefs.current[selectedPropertyId];
+    if (!node) return;
+
+    node.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+  }, [selectedPropertyId, showMap]);
 
   const copyPropertyLink = async (propertyId: string) => {
     const url = `${window.location.origin}/properties/${propertyId}`;
@@ -403,18 +603,13 @@ export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
       });
     }
 
-    if (filters.status === "for_sale") {
+    if (filters.status !== "all") {
       chips.push({
-        id: "status-sale",
-        label: language === "tr" ? "Satılık" : "For Sale",
-        onRemove: () => handleFilterChange("status", "all"),
-      });
-    }
-
-    if (filters.status === "for_rent") {
-      chips.push({
-        id: "status-rent",
-        label: language === "tr" ? "Kiralık" : "For Rent",
+        id: "status",
+        label: `${language === "tr" ? "Durum" : "Status"}: ${getStatusLabel(
+          filters.status,
+          language
+        )}`,
         onRemove: () => handleFilterChange("status", "all"),
       });
     }
@@ -422,9 +617,9 @@ export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
     if (filters.propertyType !== "all") {
       chips.push({
         id: "propertyType",
-        label: `${language === "tr" ? "Tür" : "Type"}: ${filters.propertyType.replace(
-          /_/g,
-          " "
+        label: `${language === "tr" ? "Tür" : "Type"}: ${getPropertyTypeLabel(
+          filters.propertyType,
+          language
         )}`,
         onRemove: () => handleFilterChange("propertyType", "all"),
       });
@@ -481,7 +676,9 @@ export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
     if (filters.rooms !== "all") {
       chips.push({
         id: "rooms",
-        label: `${language === "tr" ? "Oda" : "Rooms"}: ${filters.rooms}`,
+        label: `${language === "tr" ? "Oda" : "Rooms"}: ${
+          filters.rooms === "5" ? "5+" : filters.rooms
+        }`,
         onRemove: () => handleFilterChange("rooms", "all"),
       });
     }
@@ -491,6 +688,26 @@ export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
         id: "featuredOnly",
         label: language === "tr" ? "Öne Çıkanlar" : "Featured Only",
         onRemove: () => handleFilterChange("featuredOnly", false),
+      });
+    }
+
+    if (filters.sortBy !== "newest") {
+      const sortLabelMap: Record<string, string> = {
+        oldest: language === "tr" ? "En Eski" : "Oldest",
+        price_asc: language === "tr" ? "Fiyat Artan" : "Price Ascending",
+        price_desc: language === "tr" ? "Fiyat Azalan" : "Price Descending",
+        area_asc: language === "tr" ? "m² Artan" : "Area Ascending",
+        area_desc: language === "tr" ? "m² Azalan" : "Area Descending",
+        most_viewed: language === "tr" ? "En Çok Görüntülenen" : "Most Viewed",
+        quality_desc: language === "tr" ? "Kaliteye Göre" : "Best Quality",
+      };
+
+      chips.push({
+        id: "sortBy",
+        label: `${language === "tr" ? "Sıralama" : "Sort"}: ${
+          sortLabelMap[filters.sortBy] ?? filters.sortBy
+        }`,
+        onRemove: () => handleFilterChange("sortBy", "newest"),
       });
     }
 
@@ -662,24 +879,24 @@ export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
         <script type="application/ld+json">{collectionPageSchema}</script>
       </Helmet>
 
-      <div className="min-h-screen bg-gray-50">
-        <section className="border-b border-gray-200 bg-white">
-          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-            <div className="mb-6 text-center">
-              <h1 className="text-3xl font-bold text-gray-900">
+      <div className="min-h-screen bg-slate-100">
+        <section className="border-b border-slate-200 bg-white">
+          <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
+            <div className="mb-4">
+              <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">
                 {language === "tr" ? "Gayrimenkul İlanları" : "Property Listings"}
               </h1>
-              <p className="mt-2 text-sm text-gray-500">{resultText}</p>
+              <p className="mt-1 text-sm text-slate-500">{resultText}</p>
             </div>
 
-            <div className="mb-4 flex flex-wrap items-center justify-center gap-2">
+            <div className="mb-4 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               <button
                 type="button"
                 onClick={() => handleQuickStatusChange("all")}
-                className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition ${
                   filters.status === "all"
                     ? "bg-brand text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                 }`}
               >
                 {language === "tr" ? "Tümü" : "All"}
@@ -688,10 +905,10 @@ export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
               <button
                 type="button"
                 onClick={() => handleQuickStatusChange("for_sale")}
-                className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition ${
                   filters.status === "for_sale"
                     ? "bg-brand text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                 }`}
               >
                 {language === "tr" ? "Satılık" : "For Sale"}
@@ -700,19 +917,19 @@ export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
               <button
                 type="button"
                 onClick={() => handleQuickStatusChange("for_rent")}
-                className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition ${
                   filters.status === "for_rent"
                     ? "bg-brand text-white"
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                 }`}
               >
                 {language === "tr" ? "Kiralık" : "For Rent"}
               </button>
             </div>
 
-            <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto_auto]">
+            <div className="grid gap-3 md:grid-cols-[1fr_auto] lg:grid-cols-[1fr_auto_auto_auto]">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
                   value={filters.search}
@@ -722,46 +939,54 @@ export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
                       : "Search listing, city, district or location"
                   }
                   onChange={(e) => handleFilterChange("search", e.target.value)}
-                  className="w-full rounded-xl border border-gray-300 bg-white py-3 pl-10 pr-4 focus:border-transparent focus:ring-2 focus:ring-cta"
+                  className="w-full rounded-xl border border-slate-300 bg-white py-3 pl-10 pr-4 text-sm focus:border-transparent focus:ring-2 focus:ring-cta"
                 />
               </div>
 
-              <button
-                type="button"
-                onClick={() => setShowMap(!showMap)}
-                className="flex items-center justify-center gap-2 rounded-xl bg-emerald-50 px-5 py-3 text-emerald-700 transition-colors hover:bg-emerald-100"
-              >
-                <MapPinned className="h-4 w-4" />
-                {showMap
-                  ? language === "tr"
-                    ? "Haritayı Gizle"
-                    : "Hide Map"
-                  : language === "tr"
-                    ? "Haritayı Göster"
-                    : "Show Map"}
-              </button>
+              <div className="grid grid-cols-3 gap-3 md:flex md:flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setShowMap(!showMap)}
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-emerald-50 px-4 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
+                >
+                  <MapPinned className="h-4 w-4" />
+                  <span className="hidden sm:inline">
+                    {showMap
+                      ? language === "tr"
+                        ? "Haritayı Gizle"
+                        : "Hide Map"
+                      : language === "tr"
+                      ? "Haritayı Göster"
+                      : "Show Map"}
+                  </span>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => setShowFilters(!showFilters)}
-                className="flex items-center justify-center gap-2 rounded-xl bg-gray-100 px-5 py-3 transition-colors hover:bg-gray-200"
-              >
-                {showFilters ? (
-                  <X className="h-4 w-4" />
-                ) : (
-                  <SlidersHorizontal className="h-4 w-4" />
-                )}
-                {showFilters ? t("filter.hideFilters") : t("filter.showFilters")}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-slate-100 px-4 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-200"
+                >
+                  {showFilters ? (
+                    <X className="h-4 w-4" />
+                  ) : (
+                    <SlidersHorizontal className="h-4 w-4" />
+                  )}
+                  <span className="hidden sm:inline">
+                    {showFilters ? t("filter.hideFilters") : t("filter.showFilters")}
+                  </span>
+                </button>
 
-              <button
-                type="button"
-                onClick={resetFilters}
-                className="flex items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-gray-700 ring-1 ring-gray-200 transition-colors hover:bg-gray-50"
-              >
-                <RefreshCw className="h-4 w-4" />
-                {language === "tr" ? "Sıfırla" : "Reset"}
-              </button>
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-medium text-slate-700 ring-1 ring-slate-200 transition-colors hover:bg-slate-50"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  <span className="hidden sm:inline">
+                    {language === "tr" ? "Sıfırla" : "Reset"}
+                  </span>
+                </button>
+              </div>
             </div>
 
             {activeFilterChips.length > 0 && (
@@ -769,13 +994,13 @@ export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
                 {activeFilterChips.map((chip) => (
                   <div
                     key={chip.id}
-                    className="inline-flex items-center gap-2 rounded-full bg-gray-100 px-3 py-1.5 text-sm text-gray-700"
+                    className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1.5 text-sm text-slate-700"
                   >
                     <span>{chip.label}</span>
                     <button
                       type="button"
                       onClick={chip.onRemove}
-                      className="rounded-full text-gray-400 transition hover:text-red-500"
+                      className="rounded-full text-slate-400 transition hover:text-red-500"
                       aria-label={language === "tr" ? "Filtreyi kaldır" : "Remove filter"}
                     >
                       <X className="h-3.5 w-3.5" />
@@ -794,16 +1019,16 @@ export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
             )}
 
             {showFilters && (
-              <div className="mt-5 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
                       {t("filter.status")}
                     </label>
                     <select
                       value={filters.status}
                       onChange={(e) => handleFilterChange("status", e.target.value)}
-                      className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5"
                     >
                       <option value="all">{language === "tr" ? "Tümü" : "All"}</option>
                       <option value="for_sale">
@@ -822,7 +1047,7 @@ export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
                       {language === "tr" ? "Emlak Türü" : "Property Type"}
                     </label>
                     <select
@@ -830,116 +1055,97 @@ export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
                       onChange={(e) =>
                         handleFilterChange("propertyType", e.target.value)
                       }
-                      className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5"
                     >
                       <option value="all">{language === "tr" ? "Tümü" : "All"}</option>
-                      <option value="apartment">
-                        {language === "tr" ? "Daire" : "Apartment"}
-                      </option>
-                      <option value="residence">
-                        {language === "tr" ? "Rezidans" : "Residence"}
-                      </option>
-                      <option value="duplex">
-                        {language === "tr" ? "Dubleks" : "Duplex"}
-                      </option>
-                      <option value="villa">{language === "tr" ? "Villa" : "Villa"}</option>
-                      <option value="detached_house">
-                        {language === "tr" ? "Müstakil Ev" : "Detached House"}
-                      </option>
-                      <option value="land">{language === "tr" ? "Arsa" : "Land"}</option>
-                      <option value="field">{language === "tr" ? "Tarla" : "Field"}</option>
-                      <option value="farm">{language === "tr" ? "Çiftlik" : "Farm"}</option>
-                      <option value="office">{language === "tr" ? "Ofis" : "Office"}</option>
-                      <option value="shop">{language === "tr" ? "Dükkan" : "Shop"}</option>
-                      <option value="building">
-                        {language === "tr" ? "Bina" : "Building"}
-                      </option>
-                      <option value="commercial">
-                        {language === "tr" ? "Ticari" : "Commercial"}
-                      </option>
+                      {PROPERTY_TYPE_OPTIONS.map((typeValue) => (
+                        <option key={typeValue} value={typeValue}>
+                          {getPropertyTypeLabel(typeValue, language)}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
                       {language === "tr" ? "Şehir" : "City"}
                     </label>
                     <input
                       type="text"
                       value={filters.city}
                       onChange={(e) => handleFilterChange("city", e.target.value)}
-                      className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5"
                     />
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
                       {language === "tr" ? "İlçe" : "District"}
                     </label>
                     <input
                       type="text"
                       value={filters.district}
                       onChange={(e) => handleFilterChange("district", e.target.value)}
-                      className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5"
                     />
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
                       {language === "tr" ? "Min Fiyat" : "Min Price"}
                     </label>
                     <input
                       type="number"
                       value={filters.minPrice}
                       onChange={(e) => handleFilterChange("minPrice", e.target.value)}
-                      className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5"
                     />
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
                       {language === "tr" ? "Max Fiyat" : "Max Price"}
                     </label>
                     <input
                       type="number"
                       value={filters.maxPrice}
                       onChange={(e) => handleFilterChange("maxPrice", e.target.value)}
-                      className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5"
                     />
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
                       {language === "tr" ? "Min m²" : "Min m²"}
                     </label>
                     <input
                       type="number"
                       value={filters.minArea}
                       onChange={(e) => handleFilterChange("minArea", e.target.value)}
-                      className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5"
                     />
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
                       {language === "tr" ? "Max m²" : "Max m²"}
                     </label>
                     <input
                       type="number"
                       value={filters.maxArea}
                       onChange={(e) => handleFilterChange("maxArea", e.target.value)}
-                      className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5"
                     />
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
                       {language === "tr" ? "Oda Sayısı" : "Rooms"}
                     </label>
                     <select
                       value={filters.rooms}
                       onChange={(e) => handleFilterChange("rooms", e.target.value)}
-                      className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5"
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5"
                     >
                       <option value="all">{language === "tr" ? "Tümü" : "All"}</option>
                       <option value="1">1</option>
@@ -951,15 +1157,15 @@ export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
                   </div>
 
                   <div>
-                    <label className="mb-2 block text-sm font-medium text-gray-700">
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
                       {language === "tr" ? "Sıralama" : "Sort By"}
                     </label>
                     <div className="relative">
-                      <ArrowUpDown className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                      <ArrowUpDown className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                       <select
                         value={filters.sortBy}
                         onChange={(e) => handleFilterChange("sortBy", e.target.value)}
-                        className="w-full rounded-xl border border-gray-300 bg-white py-2.5 pl-9 pr-3"
+                        className="w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-9 pr-3"
                       >
                         <option value="newest">
                           {language === "tr" ? "En Yeni" : "Newest"}
@@ -982,6 +1188,9 @@ export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
                         <option value="most_viewed">
                           {language === "tr" ? "En Çok Görüntülenen" : "Most Viewed"}
                         </option>
+                        <option value="quality_desc">
+                          {language === "tr" ? "Kaliteye Göre" : "Best Quality"}
+                        </option>
                       </select>
                     </div>
                   </div>
@@ -995,7 +1204,7 @@ export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
                       className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 font-medium transition ${
                         filters.featuredOnly
                           ? "bg-amber-500 text-white hover:bg-amber-600"
-                          : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                       }`}
                     >
                       <Star className="h-4 w-4" />
@@ -1008,84 +1217,136 @@ export default function PropertiesPage({ onNavigate }: PropertiesPageProps) {
           </div>
         </section>
 
-        <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-          {showMap && (
-            <div className="mb-6 overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-              <div className="flex flex-col gap-3 border-b border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900">
-                    {language === "tr" ? "Harita Görünümü" : "Map View"}
-                  </h2>
-                  <p className="text-sm text-gray-500">
+        <section className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
+          <div className="mb-4 flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <div>
+              <p className="text-sm font-medium text-slate-500">
+                {language === "tr" ? "Sonuçlar" : "Results"}
+              </p>
+              <p className="text-base font-semibold text-slate-900">{resultText}</p>
+            </div>
+
+            {showMap && mapFilterEnabled ? (
+              <div className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+                {language === "tr" ? "Harita filtresi aktif" : "Map filter active"}
+              </div>
+            ) : null}
+          </div>
+
+          <div
+            className={
+              showMap
+                ? "grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_420px]"
+                : ""
+            }
+          >
+            <div className="min-w-0">
+              {loading ? (
+                <div className="flex flex-col gap-3">
+                  {[1, 2, 3, 4, 5, 6].map((item) => (
+                    <div
+                      key={item}
+                      className="h-[150px] animate-pulse rounded-2xl bg-slate-200"
+                    />
+                  ))}
+                </div>
+              ) : visibleProperties.length > 0 ? (
+                <div className="flex flex-col gap-3">
+                  {visibleProperties.map((property) => {
+                    const isSelected = selectedPropertyId === property.id;
+
+                    return (
+                      <div
+                        key={property.id}
+                        ref={(node) => {
+                          propertyCardRefs.current[property.id] = node;
+                        }}
+                        onMouseEnter={() => {
+                          if (showMap) {
+                            setSelectedPropertyId(property.id);
+                          }
+                        }}
+                        className={`rounded-2xl transition ${
+                          isSelected
+                            ? "ring-2 ring-brand/40 ring-offset-2 ring-offset-slate-100"
+                            : ""
+                        }`}
+                      >
+                        <PropertyCard
+                          property={property}
+                          onClick={() => onNavigate("property-detail", property.id)}
+                          isFavorite={favoriteIds.includes(property.id)}
+                          onToggleFavorite={toggleFavorite}
+                          onShareWhatsApp={shareOnWhatsApp}
+                          onCopyLink={copyPropertyLink}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-slate-200 bg-white px-6 py-16 text-center shadow-sm">
+                  <h3 className="text-xl font-semibold text-slate-900">
+                    {language === "tr" ? "İlan bulunamadı" : "No listings found"}
+                  </h3>
+                  <p className="mt-2 text-slate-500">
                     {language === "tr"
-                      ? "Haritada görünen alanla sonuçları sınırla."
-                      : "Limit results to the visible map area."}
+                      ? "Filtrelerini değiştirerek tekrar deneyebilirsin."
+                      : "Try changing your filters and search again."}
                   </p>
                 </div>
+              )}
+            </div>
 
-                <button
-                  type="button"
-                  onClick={() => setMapFilterEnabled((prev) => !prev)}
-                  className={`rounded-xl px-4 py-2.5 text-sm font-medium transition ${
-                    mapFilterEnabled
-                      ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                  }`}
-                >
-                  {mapFilterEnabled
-                    ? language === "tr"
-                      ? "Harita Filtresi Açık"
-                      : "Map Filter On"
-                    : language === "tr"
+            {showMap && (
+              <div className="lg:sticky lg:top-24 lg:h-[78vh]">
+                <div className="mb-3 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">
+                      {language === "tr" ? "Harita Görünümü" : "Map View"}
+                    </h2>
+                    <p className="text-sm text-slate-500">
+                      {language === "tr"
+                        ? "Haritada görünen alanla sonuçları sınırla."
+                        : "Limit results to the visible map area."}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setMapFilterEnabled((prev) => !prev)}
+                    className={`rounded-xl px-4 py-2.5 text-sm font-medium transition ${
+                      mapFilterEnabled
+                        ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                    }`}
+                  >
+                    {mapFilterEnabled
+                      ? language === "tr"
+                        ? "Harita Filtresi Açık"
+                        : "Map Filter On"
+                      : language === "tr"
                       ? "Harita Filtresini Aç"
                       : "Enable Map Filter"}
-                </button>
-              </div>
+                  </button>
+                </div>
 
-              <div className="h-[420px]">
-                <PropertyMap
-                  properties={mappedProperties}
-                  onSelect={(propertyId: string) =>
-                    onNavigate("property-detail", propertyId)
-                  }
-                  onBoundsChange={(bounds) => setMapBounds(bounds as MapBoundsValue)}
-                />
+                <div className="h-[360px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:h-[420px] lg:h-[calc(78vh-76px)]">
+                  <PropertyMap
+                    properties={mappedProperties}
+                    selectedPropertyId={selectedPropertyId}
+                    onSelect={(propertyId: string) => {
+                      setSelectedPropertyId(propertyId);
+                    }}
+                    onOpenDetail={(propertyId: string) =>
+                      onNavigate("property-detail", propertyId)
+                    }
+                    onBoundsChange={(bounds) => setMapBounds(bounds as MapBoundsValue)}
+                  />
+                </div>
               </div>
-            </div>
-          )}
-
-          {loading ? (
-            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-              {[1, 2, 3, 4, 5, 6].map((item) => (
-                <div key={item} className="h-80 animate-pulse rounded-2xl bg-gray-200" />
-              ))}
-            </div>
-          ) : visibleProperties.length > 0 ? (
-            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-              {visibleProperties.map((property) => (
-                <PropertyCard
-                  key={property.id}
-                  property={property}
-                  onClick={() => onNavigate("property-detail", property.id)}
-                  isFavorite={favoriteIds.includes(property.id)}
-                  onToggleFavorite={toggleFavorite}
-                  onShareWhatsApp={shareOnWhatsApp}
-                  onCopyLink={copyPropertyLink}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-2xl border border-gray-200 bg-white px-6 py-16 text-center shadow-sm">
-              <h3 className="text-xl font-semibold text-gray-900">
-                {language === "tr" ? "İlan bulunamadı" : "No listings found"}
-              </h3>
-              <p className="mt-2 text-gray-500">
-                {language === "tr"
-                  ? "Filtrelerini değiştirerek tekrar deneyebilirsin."
-                  : "Try changing your filters and search again."}
-              </p>
-            </div>
-          )}
+            )}
+          </div>
         </section>
       </div>
     </>

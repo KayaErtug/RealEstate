@@ -21,6 +21,7 @@ import { supabase } from "../lib/supabase";
 import type { Property } from "../lib/database.types";
 import PropertyCard from "../components/PropertyCard";
 import { useLanguage } from "../contexts/LanguageContext";
+import HomeVehiclesShowcase from "../components/home/HomeVehiclesShowcase";
 
 interface HomePageProps {
   onNavigate: (page: string, propertyId?: string) => void;
@@ -1114,6 +1115,8 @@ export default function HomePage({ onNavigate }: HomePageProps) {
             </div>
           )}
         </section>
+
+        <HomeVehiclesShowcase onNavigate={onNavigate} />
 
         <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
           <div className="mb-8 flex items-center justify-between">

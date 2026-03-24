@@ -1,220 +1,473 @@
 // src/pages/VehicleDetailPage.tsx
 import { useEffect, useMemo, useState } from 'react';
+import { Helmet } from 'react-helmet-async';
+import { Link, useParams } from 'react-router-dom';
 import {
+  AlertCircle,
   ArrowLeft,
+  CalendarDays,
   Car,
-  Gauge,
-  Fuel,
-  Cog,
-  MapPin,
-  CheckCircle,
+  Check,
   ChevronLeft,
   ChevronRight,
-  Share2,
+  Cog,
   Copy,
+  ExternalLink,
+  Fuel,
+  Gauge,
+  Heart,
+  MapPin,
+  MessageCircle,
+  Phone,
+  ShieldCheck,
+  Sparkles,
+  Star,
+  Zap,
 } from 'lucide-react';
-import { Helmet } from 'react-helmet-async';
 import { supabase } from '../lib/supabase';
-import type { Vehicle } from '../lib/database.types';
-import { useLanguage } from '../contexts/LanguageContext';
 
-const WHATSAPP_NUMBER = '+44 7355 612852';
+type Vehicle = {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  price: number | null;
+  currency: string | null;
+  location: string | null;
+  city: string | null;
+  district: string | null;
+  brand: string | null;
+  model: string | null;
+  year: number | null;
+  mileage: number | null;
+  fuel_type: string | null;
+  transmission: string | null;
+  engine_power: number | null;
+  engine_volume: number | null;
+  body_type: string | null;
+  color: string | null;
+  traction: string | null;
+  condition: string | null;
+  plate_origin: string | null;
+  exchange: boolean | null;
+  warranty: boolean | null;
+  heavy_damage_record: boolean | null;
+  from_who: string | null;
+  featured: boolean | null;
+  cover_image: string | null;
+  images: string[] | null;
+  created_at: string;
+  slug?: string | null;
+};
 
-interface VehicleDetailPageProps {
-  vehicleId: string;
-  onNavigate: (page: string) => void;
+type VehicleDetailPageProps = {
+  vehicleId?: string;
+  onNavigate?: (page: string, id?: string) => void;
+};
+
+const SITE_URL = 'https://varolgayrimenkul.com';
+const COMPANY_NAME = 'Varol Gayrimenkul';
+const WHATSAPP_NUMBER = '905323402036';
+const PHONE_PRIMARY = '+90 532 340 20 36';
+const PHONE_SECONDARY = '+90 258 211 07 18';
+
+function formatPrice(price: number | null, currency: string | null) {
+  if (price === null || price === undefined) return 'Fiyat sorunuz';
+
+  const safeCurrency = currency || 'TRY';
+  const locale =
+    safeCurrency === 'TRY'
+      ? 'tr-TR'
+      : safeCurrency === 'USD'
+      ? 'en-US'
+      : safeCurrency === 'EUR'
+      ? 'de-DE'
+      : 'tr-TR';
+
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: safeCurrency,
+    maximumFractionDigits: 0,
+  }).format(price);
 }
 
-type Lang = 'tr' | 'en';
+function formatNumber(value: number | null | undefined) {
+  if (value === null || value === undefined) return 'Belirtilmemiş';
+  return new Intl.NumberFormat('tr-TR').format(value);
+}
 
-export default function VehicleDetailPage({ vehicleId, onNavigate }: VehicleDetailPageProps) {
-  const { language, t } = useLanguage() as { language: Lang; t: (k: string) => string };
+function formatDate(value: string) {
+  return new Date(value).toLocaleDateString('tr-TR', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+function buildVehicleLocation(vehicle: Vehicle | null) {
+  if (!vehicle) return '';
+  return [vehicle.location, vehicle.district, vehicle.city].filter(Boolean).join(', ');
+}
+
+function getVehicleImages(vehicle: Vehicle | null) {
+  if (!vehicle) return [];
+  const list = [vehicle.cover_image, ...(vehicle.images || [])].filter(Boolean) as string[];
+  return Array.from(new Set(list));
+}
+
+function mapFuelType(value: string | null) {
+  if (!value) return 'Belirtilmemiş';
+
+  const map: Record<string, string> = {
+    gasoline: 'Benzin',
+    diesel: 'Dizel',
+    lpg: 'LPG',
+    hybrid: 'Hibrit',
+    electric: 'Elektrikli',
+  };
+
+  return map[value] || value;
+}
+
+function mapTransmission(value: string | null) {
+  if (!value) return 'Belirtilmemiş';
+
+  const map: Record<string, string> = {
+    manual: 'Manuel',
+    automatic: 'Otomatik',
+    semi_automatic: 'Yarı Otomatik',
+  };
+
+  return map[value] || value;
+}
+
+function mapCondition(value: string | null) {
+  if (!value) return 'Belirtilmemiş';
+
+  const map: Record<string, string> = {
+    new: 'Sıfır',
+    used: 'İkinci El',
+  };
+
+  return map[value] || value;
+}
+
+function mapStatus(value: string | null) {
+  if (!value) return 'İlanda';
+
+  const map: Record<string, string> = {
+    available: 'Satışta',
+    active: 'Aktif',
+    pending: 'Kapora Alındı',
+    passive: 'Pasif',
+    sold: 'Satıldı',
+  };
+
+  return map[value] || value;
+}
+
+function mapHeavyDamage(value: boolean | null) {
+  if (value === null) return 'Belirtilmemiş';
+  return value ? 'Var' : 'Yok';
+}
+
+function getPublicVehicleUrl(vehicle: Vehicle | null, id?: string) {
+  if (vehicle?.slug) return `${SITE_URL}/arac/${vehicle.slug}`;
+  return `${SITE_URL}/vehicles/${id || ''}`;
+}
+
+export default function VehicleDetailPage({
+  vehicleId,
+  onNavigate,
+}: VehicleDetailPageProps) {
+  const params = useParams();
+  const id = vehicleId || params.id;
 
   const [vehicle, setVehicle] = useState<Vehicle | null>(null);
+  const [similarVehicles, setSimilarVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const [selectedImage, setSelectedImage] = useState(0);
-  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
-  const [zoom, setZoom] = useState(1);
-
-  const [shareOpen, setShareOpen] = useState(false);
-
-  const safeT = (key: string, trFallback: string, enFallback: string) => {
-    const out = t(key);
-    if (out === key) return language === 'tr' ? trFallback : enFallback;
-    return out;
-  };
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    void loadVehicle();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vehicleId]);
+    if (!id) return;
+    setIsFavorite(localStorage.getItem(`favorite_vehicle_${id}`) === 'true');
+  }, [id]);
 
   useEffect(() => {
-    const sp = new URLSearchParams(window.location.search);
-    const img = sp.get('img');
-    const lb = sp.get('lb');
+    async function fetchVehicle() {
+      if (!id) {
+        setVehicle(null);
+        setSimilarVehicles([]);
+        setLoading(false);
+        return;
+      }
 
-    if (img && !Number.isNaN(Number(img))) {
-      setSelectedImage(Math.max(0, Number(img)));
-    }
-
-    if (lb === '1') {
-      setIsLightboxOpen(true);
-    }
-  }, []);
-
-  const setQuery = (patch: Record<string, string | null>, push = false) => {
-    const url = new URL(window.location.href);
-
-    Object.entries(patch).forEach(([k, v]) => {
-      if (v === null) url.searchParams.delete(k);
-      else url.searchParams.set(k, v);
-    });
-
-    if (push) window.history.pushState({}, '', url.toString());
-    else window.history.replaceState({}, '', url.toString());
-  };
-
-  const loadVehicle = async () => {
-    try {
       setLoading(true);
 
-      const { data, error } = await supabase
-        .from('vehicles')
-        .select('*')
-        .eq('id', vehicleId)
-        .maybeSingle();
+      const { data, error } = await supabase.from('vehicles').select('*').eq('id', id).single();
 
-      if (error) throw error;
-
-      if (data) {
-        const vehicleRow = data as Vehicle;
-        setVehicle(vehicleRow);
-
-        const currentViews = typeof vehicleRow.views === 'number' ? vehicleRow.views : 0;
-        await supabase.from('vehicles').update({ views: currentViews + 1 }).eq('id', vehicleId);
-      } else {
+      if (error || !data) {
         setVehicle(null);
+        setSimilarVehicles([]);
+        setLoading(false);
+        return;
       }
-    } catch (error) {
-      console.error('Error loading vehicle:', error);
-      setVehicle(null);
-    } finally {
+
+      const currentVehicle = data as Vehicle;
+      setVehicle(currentVehicle);
+
+      const similarFilters = [
+        currentVehicle.brand ? `brand.eq.${currentVehicle.brand}` : '',
+        currentVehicle.city ? `city.eq.${currentVehicle.city}` : '',
+      ].filter(Boolean);
+
+      if (similarFilters.length > 0) {
+        const { data: similarData } = await supabase
+          .from('vehicles')
+          .select('*')
+          .neq('id', currentVehicle.id)
+          .eq('status', 'available')
+          .or(similarFilters.join(','))
+          .limit(6);
+
+        setSimilarVehicles((similarData as Vehicle[]) || []);
+      } else {
+        const { data: similarData } = await supabase
+          .from('vehicles')
+          .select('*')
+          .neq('id', currentVehicle.id)
+          .eq('status', 'available')
+          .limit(6);
+
+        setSimilarVehicles((similarData as Vehicle[]) || []);
+      }
+
       setLoading(false);
     }
+
+    fetchVehicle();
+  }, [id]);
+
+  useEffect(() => {
+    setActiveImageIndex(0);
+  }, [vehicle?.id]);
+
+  const images = useMemo(() => getVehicleImages(vehicle), [vehicle]);
+  const activeImage = images[activeImageIndex] || '/placeholder.svg';
+  const vehicleLocation = buildVehicleLocation(vehicle);
+  const canonicalUrl = getPublicVehicleUrl(vehicle, id);
+
+  const seoTitle = vehicle ? `${vehicle.title} | ${COMPANY_NAME}` : `Araç Detayı | ${COMPANY_NAME}`;
+  const seoDescription = vehicle
+    ? `${vehicle.title}. ${vehicle.brand || ''} ${vehicle.model || ''} ${
+        vehicle.year || ''
+      } model araç ilanı, fiyat, teknik bilgiler, açıklama ve iletişim detayları ${COMPANY_NAME}’da.`
+    : `${COMPANY_NAME} araç detay sayfası.`;
+
+  const quickSpecs = [
+    {
+      label: 'Yıl',
+      value: vehicle?.year ? String(vehicle.year) : 'Belirtilmemiş',
+      icon: <CalendarDays className="h-5 w-5" />,
+    },
+    {
+      label: 'Kilometre',
+      value: vehicle?.mileage ? `${formatNumber(vehicle.mileage)} km` : 'Belirtilmemiş',
+      icon: <Gauge className="h-5 w-5" />,
+    },
+    {
+      label: 'Yakıt',
+      value: mapFuelType(vehicle?.fuel_type || null),
+      icon: <Fuel className="h-5 w-5" />,
+    },
+    {
+      label: 'Vites',
+      value: mapTransmission(vehicle?.transmission || null),
+      icon: <Cog className="h-5 w-5" />,
+    },
+  ];
+
+  const detailedSpecs = [
+    {
+      label: 'Marka',
+      value: vehicle?.brand || 'Belirtilmemiş',
+      icon: <ShieldCheck className="h-5 w-5" />,
+    },
+    {
+      label: 'Model',
+      value: vehicle?.model || 'Belirtilmemiş',
+      icon: <Car className="h-5 w-5" />,
+    },
+    {
+      label: 'Kasa Tipi',
+      value: vehicle?.body_type || 'Belirtilmemiş',
+      icon: <Car className="h-5 w-5" />,
+    },
+    {
+      label: 'Renk',
+      value: vehicle?.color || 'Belirtilmemiş',
+      icon: <Sparkles className="h-5 w-5" />,
+    },
+    {
+      label: 'Çekiş',
+      value: vehicle?.traction || 'Belirtilmemiş',
+      icon: <Zap className="h-5 w-5" />,
+    },
+    {
+      label: 'Motor Gücü',
+      value: vehicle?.engine_power ? `${vehicle.engine_power} hp` : 'Belirtilmemiş',
+      icon: <Gauge className="h-5 w-5" />,
+    },
+    {
+      label: 'Motor Hacmi',
+      value: vehicle?.engine_volume ? `${vehicle.engine_volume} cc` : 'Belirtilmemiş',
+      icon: <Gauge className="h-5 w-5" />,
+    },
+    {
+      label: 'Durum',
+      value: mapCondition(vehicle?.condition || null),
+      icon: <Check className="h-5 w-5" />,
+    },
+    {
+      label: 'Kimden',
+      value: vehicle?.from_who || 'Belirtilmemiş',
+      icon: <ShieldCheck className="h-5 w-5" />,
+    },
+    {
+      label: 'Plaka / Kayıt',
+      value: vehicle?.plate_origin || 'Belirtilmemiş',
+      icon: <MapPin className="h-5 w-5" />,
+    },
+    {
+      label: 'Ağır Hasar Kaydı',
+      value: mapHeavyDamage(vehicle?.heavy_damage_record ?? null),
+      icon: <AlertCircle className="h-5 w-5" />,
+    },
+    {
+      label: 'Takas',
+      value:
+        vehicle?.exchange === null
+          ? 'Belirtilmemiş'
+          : vehicle?.exchange
+          ? 'Evet'
+          : 'Hayır',
+      icon: <Star className="h-5 w-5" />,
+    },
+  ];
+
+  const badges = [
+    vehicle?.featured ? 'Öne Çıkan İlan' : null,
+    vehicle?.warranty ? 'Garantili' : null,
+    vehicle?.exchange ? 'Takas Değerlendirilir' : null,
+    vehicle?.heavy_damage_record === false ? 'Ağır Hasar Kaydı Yok' : null,
+  ].filter(Boolean) as string[];
+
+  const toggleFavorite = () => {
+    if (!id) return;
+    const next = !isFavorite;
+    setIsFavorite(next);
+    localStorage.setItem(`favorite_vehicle_${id}`, String(next));
   };
 
-  const humanizeEnum = (s?: string | null) => {
-    if (!s) return '-';
-    return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-  };
-
-  const dictionaries = useMemo(() => {
-    return {
-      transmission: {
-        manual: { tr: 'Manuel', en: 'Manual' },
-        automatic: { tr: 'Otomatik', en: 'Automatic' },
-        semi_automatic: { tr: 'Yarı Otomatik', en: 'Semi-automatic' },
-        tiptronic: { tr: 'Tiptronic', en: 'Tiptronic' },
-      } as Record<string, { tr: string; en: string }>,
-
-      fuel: {
-        gasoline: { tr: 'Benzin', en: 'Gasoline' },
-        diesel: { tr: 'Dizel', en: 'Diesel' },
-        lpg: { tr: 'LPG', en: 'LPG' },
-        hybrid: { tr: 'Hibrit', en: 'Hybrid' },
-        electric: { tr: 'Elektrik', en: 'Electric' },
-      } as Record<string, { tr: string; en: string }>,
-
-      status: {
-        for_sale: { tr: 'Satılık', en: 'For sale' },
-        sold: { tr: 'Satıldı', en: 'Sold' },
-      } as Record<string, { tr: string; en: string }>,
-
-      drive_type: {
-        fwd: { tr: 'Önden Çekiş', en: 'FWD' },
-        rwd: { tr: 'Arkadan İtiş', en: 'RWD' },
-        awd: { tr: '4 Çeker', en: 'AWD/4WD' },
-        '4x4': { tr: '4x4', en: '4x4' },
-      } as Record<string, { tr: string; en: string }>,
-
-      damage_status: {
-        none: { tr: 'Hasarsız', en: 'No damage' },
-        minor: { tr: 'Boyalı/Minör', en: 'Minor' },
-        medium: { tr: 'Orta', en: 'Medium' },
-        heavy: { tr: 'Ağır Hasarlı', en: 'Heavily damaged' },
-      } as Record<string, { tr: string; en: string }>,
-    };
-  }, []);
-
-  const labelFrom = (dict: Record<string, { tr: string; en: string }>, value?: string | null) => {
-    if (!value) return '-';
-    return dict[value]?.[language] ?? humanizeEnum(value);
-  };
-
-  const formatPrice = (price: number, currency: string) => {
-    const locale = language === 'tr' ? 'tr-TR' : 'en-US';
-    return new Intl.NumberFormat(locale, {
-      style: 'currency',
-      currency,
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(price);
-  };
-
-  const formatNumber = (n: number) => {
-    const locale = language === 'tr' ? 'tr-TR' : 'en-US';
-    return new Intl.NumberFormat(locale).format(n);
-  };
-
-  const openLightbox = () => {
-    setIsLightboxOpen(true);
-    setZoom(1);
-    setQuery({ lb: '1', img: String(selectedImage) }, false);
-  };
-
-  const closeLightbox = () => {
-    setIsLightboxOpen(false);
-    setZoom(1);
-    setQuery({ lb: null }, false);
-  };
-
-  const getShareUrl = () => window.location.href;
-
-  const copyLink = async () => {
+  const handleCopyLink = async () => {
     try {
-      await navigator.clipboard.writeText(getShareUrl());
-      alert(safeT('share.copied', 'Link kopyalandı!', 'Link copied!'));
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
     } catch {
-      alert(getShareUrl());
+      setCopied(false);
     }
   };
 
-  const shareNative = async () => {
-    const url = getShareUrl();
-    const title = vehicle?.title || 'Varol Gayrimenkul';
+  const handlePrevImage = () => {
+    if (images.length <= 1) return;
+    setActiveImageIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
+  };
 
-    if ((navigator as Navigator & { share?: (data: ShareData) => Promise<void> }).share) {
-      try {
-        await (navigator as Navigator & { share: (data: ShareData) => Promise<void> }).share({
-          title,
-          text: title,
-          url,
-        });
-      } catch {
-        // kullanıcı iptal edebilir
+  const handleNextImage = () => {
+    if (images.length <= 1) return;
+    setActiveImageIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
+  };
+
+  const whatsappMessage = encodeURIComponent(
+    `Merhaba, ${vehicle?.title || 'araç ilanı'} hakkında bilgi almak istiyorum.`
+  );
+
+  const productSchema = vehicle
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'Product',
+        name: vehicle.title,
+        description: vehicle.description || vehicle.title,
+        image: images.length > 0 ? images : vehicle.cover_image ? [vehicle.cover_image] : [],
+        brand: {
+          '@type': 'Brand',
+          name: vehicle.brand || 'Belirtilmemiş',
+        },
+        category: 'Vehicle',
+        offers: {
+          '@type': 'Offer',
+          priceCurrency: vehicle.currency || 'TRY',
+          price: vehicle.price || 0,
+          availability:
+            vehicle.status === 'sold'
+              ? 'https://schema.org/SoldOut'
+              : 'https://schema.org/InStock',
+          url: canonicalUrl,
+        },
       }
-    } else {
-      setShareOpen((s) => !s);
+    : null;
+
+  const BackButton = () => {
+    if (onNavigate) {
+      return (
+        <button
+          type="button"
+          onClick={() => onNavigate('vehicles')}
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 transition hover:text-slate-900"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Araç ilanlarına dön
+        </button>
+      );
     }
+
+    return (
+      <Link
+        to="/vehicles"
+        className="inline-flex items-center gap-2 text-sm font-semibold text-slate-700 transition hover:text-slate-900"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Araç ilanlarına dön
+      </Link>
+    );
   };
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="animate-pulse text-gray-600">
-          {safeT('common.loading', 'Yükleniyor...', 'Loading...')}
+      <div className="min-h-screen bg-slate-50">
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          <div className="animate-pulse space-y-6">
+            <div className="h-10 w-48 rounded-2xl bg-slate-200" />
+            <div className="grid gap-8 lg:grid-cols-[1.35fr_0.65fr]">
+              <div className="space-y-5">
+                <div className="h-[480px] rounded-[28px] bg-slate-200" />
+                <div className="grid grid-cols-5 gap-3">
+                  {Array.from({ length: 5 }).map((_, index) => (
+                    <div key={index} className="h-24 rounded-2xl bg-slate-200" />
+                  ))}
+                </div>
+                <div className="h-60 rounded-[28px] bg-slate-200" />
+                <div className="h-80 rounded-[28px] bg-slate-200" />
+              </div>
+              <div className="space-y-5">
+                <div className="h-72 rounded-[28px] bg-slate-200" />
+                <div className="h-80 rounded-[28px] bg-slate-200" />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -222,503 +475,463 @@ export default function VehicleDetailPage({ vehicleId, onNavigate }: VehicleDeta
 
   if (!vehicle) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <h2 className="mb-4 text-2xl font-bold text-gray-900">
-            {language === 'tr' ? 'Araç ilanı bulunamadı' : 'Vehicle listing not found'}
-          </h2>
-          <button
-            onClick={() => onNavigate('vehicles')}
-            className="text-brand hover:text-brand-hover"
-          >
-            {language === 'tr' ? 'Araç İlanlarına Dön' : 'Back to vehicle listings'}
-          </button>
+      <div className="min-h-screen bg-slate-50">
+        <div className="mx-auto flex max-w-3xl flex-col items-center px-4 py-24 text-center sm:px-6 lg:px-8">
+          <div className="rounded-full bg-white p-5 shadow-sm ring-1 ring-slate-200">
+            <Car className="h-10 w-10 text-slate-500" />
+          </div>
+          <h1 className="mt-6 text-3xl font-bold text-slate-900">Araç ilanı bulunamadı</h1>
+          <p className="mt-3 max-w-xl text-base leading-7 text-slate-600">
+            Bu ilan kaldırılmış olabilir veya bağlantı geçersiz olabilir.
+          </p>
+
+          {onNavigate ? (
+            <button
+              type="button"
+              onClick={() => onNavigate('vehicles')}
+              className="mt-8 inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Araç ilanlarına dön
+            </button>
+          ) : (
+            <Link
+              to="/vehicles"
+              className="mt-8 inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Araç ilanlarına dön
+            </Link>
+          )}
         </div>
       </div>
     );
   }
 
-  const images =
-    vehicle.images && vehicle.images.length > 0
-      ? vehicle.images.slice(0, 20)
-      : [
-          'https://images.pexels.com/photos/210019/pexels-photo-210019.jpeg?auto=compress&cs=tinysrgb&w=1600',
-        ];
-
-  const nextImage = () => {
-    setSelectedImage((i) => {
-      const ni = (i + 1) % images.length;
-      setQuery({ img: String(ni) }, false);
-      return ni;
-    });
-  };
-
-  const prevImage = () => {
-    setSelectedImage((i) => {
-      const ni = (i - 1 + images.length) % images.length;
-      setQuery({ img: String(ni) }, false);
-      return ni;
-    });
-  };
-
-  useEffect(() => {
-    if (!isLightboxOpen) return;
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeLightbox();
-      if (e.key === 'ArrowRight') nextImage();
-      if (e.key === 'ArrowLeft') prevImage();
-      if (e.key === '+') setZoom((z) => Math.min(3, +(z + 0.2).toFixed(2)));
-      if (e.key === '-') setZoom((z) => Math.max(1, +(z - 0.2).toFixed(2)));
-    };
-
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLightboxOpen, images.length]);
-
-  const waText = encodeURIComponent(
-    language === 'tr'
-      ? `Merhaba, ${vehicle.brand} ${vehicle.model} (${vehicle.year}) araç ilanı hakkında bilgi almak istiyorum. (İlan: ${vehicle.title})`
-      : `Hello, I would like to get information about ${vehicle.brand} ${vehicle.model} (${vehicle.year}). (Listing: ${vehicle.title})`
-  );
-
-  const contactDigits = (vehicle.contact_phone || '').replace(/\D/g, '');
-  const waNumber = contactDigits.length >= 10 ? contactDigits.replace(/^0/, '9') : WHATSAPP_NUMBER;
-  const waLink = `https://wa.me/${waNumber}?text=${waText}`;
-
-  const waShareLink = `https://wa.me/?text=${encodeURIComponent(`${vehicle.title}\n${getShareUrl()}`)}`;
-  const fbShareLink = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(getShareUrl())}`;
-
-  const transmissionLabel = labelFrom(dictionaries.transmission, vehicle.transmission);
-  const fuelLabel = labelFrom(dictionaries.fuel, vehicle.fuel);
-  const statusLabel = labelFrom(dictionaries.status, vehicle.status);
-  const driveLabel = vehicle.drive_type ? labelFrom(dictionaries.drive_type, vehicle.drive_type) : null;
-  const damageLabel = vehicle.damage_status
-    ? labelFrom(dictionaries.damage_status, vehicle.damage_status)
-    : null;
-
-  const canonicalUrl = `${window.location.origin}/vehicles/${vehicle.id}`;
-  const pageTitle =
-    language === 'tr'
-      ? `${vehicle.brand} ${vehicle.model} ${vehicle.year} | Araç İlanı | Varol Gayrimenkul`
-      : `${vehicle.brand} ${vehicle.model} ${vehicle.year} | Vehicle Listing | Varol Real Estate`;
-
-  const pageDescription =
-    language === 'tr'
-      ? `${vehicle.brand} ${vehicle.model} ${vehicle.year} model araç ilanı. ${formatNumber(
-          vehicle.km
-        )} km, ${formatPrice(vehicle.price, vehicle.currency)} fiyat, ${vehicle.city}${
-          vehicle.district ? ` / ${vehicle.district}` : ''
-        } konum.`
-      : `${vehicle.brand} ${vehicle.model} ${vehicle.year} vehicle listing. ${formatNumber(
-          vehicle.km
-        )} km, ${formatPrice(vehicle.price, vehicle.currency)}, located in ${vehicle.city}${
-          vehicle.district ? ` / ${vehicle.district}` : ''
-        }.`;
-
-  const pageImage = images[0];
-
-  const breadcrumbSchema = JSON.stringify({
-    '@context': 'https://schema.org',
-    '@type': 'BreadcrumbList',
-    itemListElement: [
-      {
-        '@type': 'ListItem',
-        position: 1,
-        name: language === 'tr' ? 'Ana Sayfa' : 'Home',
-        item: `${window.location.origin}/`,
-      },
-      {
-        '@type': 'ListItem',
-        position: 2,
-        name: language === 'tr' ? 'Araç İlanları' : 'Vehicle Listings',
-        item: `${window.location.origin}/vehicles`,
-      },
-      {
-        '@type': 'ListItem',
-        position: 3,
-        name: `${vehicle.brand} ${vehicle.model} ${vehicle.year}`,
-        item: canonicalUrl,
-      },
-    ],
-  });
-
-  const vehicleSchema = JSON.stringify({
-    '@context': 'https://schema.org',
-    '@type': 'Car',
-    name: vehicle.title,
-    brand: {
-      '@type': 'Brand',
-      name: vehicle.brand,
-    },
-    model: vehicle.model,
-    vehicleModelDate: String(vehicle.year),
-    mileageFromOdometer: {
-      '@type': 'QuantitativeValue',
-      value: vehicle.km,
-      unitCode: 'KMT',
-    },
-    fuelType: fuelLabel,
-    vehicleTransmission: transmissionLabel,
-    color: vehicle.color || undefined,
-    vehicleEngine: vehicle.engine
-      ? {
-          '@type': 'EngineSpecification',
-          name: vehicle.engine,
-          enginePower: vehicle.engine_power_hp
-            ? {
-                '@type': 'QuantitativeValue',
-                value: vehicle.engine_power_hp,
-                unitCode: 'H75',
-              }
-            : undefined,
-        }
-      : undefined,
-    bodyType: vehicle.body_type || undefined,
-    driveWheelConfiguration: driveLabel || undefined,
-    description: vehicle.description,
-    image: images,
-    url: canonicalUrl,
-    offers: {
-      '@type': 'Offer',
-      price: vehicle.price,
-      priceCurrency: vehicle.currency,
-      availability:
-        vehicle.status === 'sold'
-          ? 'https://schema.org/SoldOut'
-          : 'https://schema.org/InStock',
-      itemCondition: 'https://schema.org/UsedCondition',
-      url: canonicalUrl,
-      seller: {
-        '@type': 'LocalBusiness',
-        name: vehicle.contact_name || 'Varol Gayrimenkul',
-        telephone: vehicle.contact_phone || undefined,
-        address: {
-          '@type': 'PostalAddress',
-          addressLocality: vehicle.city,
-          addressRegion: vehicle.district || undefined,
-          addressCountry: 'TR',
-        },
-      },
-    },
-  });
-
   return (
-    <div className="min-h-screen bg-gray-50">
+    <>
       <Helmet>
-        <html lang={language === 'tr' ? 'tr' : 'en'} />
-        <title>{pageTitle}</title>
-        <meta name="description" content={pageDescription} />
-        <meta name="robots" content="index, follow, max-image-preview:large" />
+        <title>{seoTitle}</title>
+        <meta name="description" content={seoDescription} />
         <link rel="canonical" href={canonicalUrl} />
-
-        <meta property="og:title" content={pageTitle} />
-        <meta property="og:description" content={pageDescription} />
-        <meta property="og:type" content="website" />
+        <meta property="og:type" content="product" />
+        <meta property="og:title" content={seoTitle} />
+        <meta property="og:description" content={seoDescription} />
         <meta property="og:url" content={canonicalUrl} />
-        <meta property="og:site_name" content="Varol Gayrimenkul" />
-        <meta property="og:locale" content={language === 'tr' ? 'tr_TR' : 'en_US'} />
-        <meta property="og:image" content={pageImage} />
-
+        <meta property="og:image" content={activeImage} />
+        <meta property="og:site_name" content={COMPANY_NAME} />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content={pageTitle} />
-        <meta name="twitter:description" content={pageDescription} />
-        <meta name="twitter:image" content={pageImage} />
-
-        <script type="application/ld+json">{breadcrumbSchema}</script>
-        <script type="application/ld+json">{vehicleSchema}</script>
+        <meta name="twitter:title" content={seoTitle} />
+        <meta name="twitter:description" content={seoDescription} />
+        <meta name="twitter:image" content={activeImage} />
+        {productSchema && (
+          <script type="application/ld+json">{JSON.stringify(productSchema)}</script>
+        )}
       </Helmet>
 
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        <button
-          onClick={() => onNavigate('vehicles')}
-          className="mb-6 flex items-center gap-2 text-gray-600 hover:text-gray-900"
-        >
-          <ArrowLeft className="h-5 w-5" />
-          {safeT('common.back', 'Geri Dön', 'Back')}
-        </button>
+      <div className="min-h-screen bg-gradient-to-b from-slate-100 via-white to-slate-50">
+        <div className="border-b border-slate-200 bg-white/80 backdrop-blur">
+          <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+            <BackButton />
 
-        <div className="overflow-hidden rounded-lg bg-white shadow-md">
-          <div className="grid grid-cols-1 gap-2 p-2 lg:grid-cols-3">
-            <div className="lg:col-span-2">
-              <div className="relative">
-                <img
-                  src={images[selectedImage]}
-                  alt={vehicle.title}
-                  className="h-[520px] w-full cursor-zoom-in rounded-lg object-cover md:h-[620px]"
-                  onClick={openLightbox}
-                />
-
-                {images.length > 1 && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={prevImage}
-                      className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white hover:bg-black/55"
-                      aria-label="Prev"
-                    >
-                      <ChevronLeft className="h-5 w-5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={nextImage}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white hover:bg-black/55"
-                      aria-label="Next"
-                    >
-                      <ChevronRight className="h-5 w-5" />
-                    </button>
-                  </>
-                )}
-              </div>
-
-              {images.length > 1 && (
-                <div className="mt-2 grid grid-cols-4 gap-2 md:grid-cols-6">
-                  {images.slice(0, 20).map((image, index) => (
-                    <img
-                      key={index}
-                      src={image}
-                      alt={`${vehicle.title} ${index + 1}`}
-                      onClick={() => {
-                        setSelectedImage(index);
-                        setQuery({ img: String(index) }, false);
-                      }}
-                      className={`h-20 w-full cursor-pointer rounded-lg object-cover md:h-24 ${
-                        selectedImage === index ? 'ring-2 ring-brand' : 'opacity-70 hover:opacity-100'
-                      }`}
-                      loading="lazy"
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="rounded-lg bg-gray-50 p-6">
-              <div className="flex items-start justify-between gap-3">
-                <h2 className="mb-2 text-2xl font-bold text-gray-900">
-                  {vehicle.brand} {vehicle.model}
-                </h2>
-
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={shareNative}
-                    className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm hover:bg-gray-50"
-                  >
-                    <Share2 className="h-4 w-4" />
-                    {safeT('share.button', 'Paylaş', 'Share')}
-                  </button>
-
-                  {shareOpen && (
-                    <div className="absolute right-0 z-10 mt-2 w-56 rounded-lg border border-gray-200 bg-white p-2 shadow-lg">
-                      <a
-                        href={waShareLink}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="block rounded px-3 py-2 text-sm hover:bg-gray-50"
-                      >
-                        {safeT('share.whatsapp', 'WhatsApp', 'WhatsApp')}
-                      </a>
-                      <a
-                        href={fbShareLink}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="block rounded px-3 py-2 text-sm hover:bg-gray-50"
-                      >
-                        {safeT('share.facebook', 'Facebook', 'Facebook')}
-                      </a>
-                      <button
-                        type="button"
-                        onClick={shareNative}
-                        className="w-full rounded px-3 py-2 text-left text-sm hover:bg-gray-50"
-                        title="Mobilde Web Share ile Instagram dahil seçenekler çıkar"
-                      >
-                        {safeT('share.instagram', 'Instagram', 'Instagram')}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={copyLink}
-                        className="inline-flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm hover:bg-gray-50"
-                      >
-                        <Copy className="h-4 w-4" />
-                        {safeT('share.copyLink', 'Linki Kopyala', 'Copy link')}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <p className="mb-4 text-gray-600">
-                {vehicle.year} • {formatNumber(vehicle.km)} km
-              </p>
-
-              <p className="mb-6 text-3xl font-bold text-brand">
-                {formatPrice(vehicle.price, vehicle.currency)}
-              </p>
-
-              {(vehicle.contact_name || vehicle.contact_phone) && (
-                <div className="mb-4 rounded-lg border border-gray-200 bg-white p-3 text-sm text-gray-700">
-                  <div className="font-medium">
-                    {vehicle.contact_name || (language === 'tr' ? 'İlan Yetkilisi' : 'Listing contact')}
-                  </div>
-                  <div className="text-gray-600">{vehicle.contact_phone || '+90 507 318 22 22'}</div>
-                </div>
-              )}
-
-              <a
-                href={waLink}
-                target="_blank"
-                rel="noreferrer"
-                className="block w-full rounded-lg bg-cta py-3 text-center font-semibold text-white transition-colors hover:bg-cta-hover"
+            <div className="flex items-center gap-2">
+              <button
+                onClick={toggleFavorite}
+                className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-semibold transition ${
+                  isFavorite
+                    ? 'border-rose-200 bg-rose-50 text-rose-600'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
               >
-                {language === 'tr' ? 'WhatsApp ile İletişime Geç' : 'Contact on WhatsApp'}
-              </a>
+                <Heart className={`h-4 w-4 ${isFavorite ? 'fill-current' : ''}`} />
+                Favori
+              </button>
 
-              <div className="mt-6 space-y-3 text-sm text-gray-700">
-                <div className="flex items-center gap-2">
-                  <Car className="h-4 w-4 text-gray-500" />
-                  <span>
-                    <b>{language === 'tr' ? 'Vites:' : 'Transmission:'}</b> {transmissionLabel}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Fuel className="h-4 w-4 text-gray-500" />
-                  <span>
-                    <b>{language === 'tr' ? 'Yakıt:' : 'Fuel:'}</b> {fuelLabel}
-                  </span>
-                </div>
-
-                {driveLabel && (
-                  <div className="flex items-center gap-2">
-                    <Cog className="h-4 w-4 text-gray-500" />
-                    <span>
-                      <b>{language === 'tr' ? 'Çekiş:' : 'Drive:'}</b> {driveLabel}
-                    </span>
-                  </div>
-                )}
-
-                {damageLabel && (
-                  <div className="flex items-center gap-2">
-                    <Cog className="h-4 w-4 text-gray-500" />
-                    <span>
-                      <b>{language === 'tr' ? 'Hasar Durumu:' : 'Damage status:'}</b> {damageLabel}
-                    </span>
-                  </div>
-                )}
-
-                {vehicle.swap_available && (
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                    <span>
-                      <b>{language === 'tr' ? 'Takas:' : 'Swap:'}</b>{' '}
-                      {language === 'tr' ? 'Uygun' : 'Available'}
-                    </span>
-                  </div>
-                )}
-
-                <div className="flex items-center gap-2">
-                  <Gauge className="h-4 w-4 text-gray-500" />
-                  <span>
-                    <b>{language === 'tr' ? 'Kilometre:' : 'Mileage:'}</b> {formatNumber(vehicle.km)} km
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-gray-500" />
-                  <span>
-                    <b>{language === 'tr' ? 'Konum:' : 'Location:'}</b> {vehicle.location}, {vehicle.city}
-                    {vehicle.district ? ` / ${vehicle.district}` : ''}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Cog className="h-4 w-4 text-gray-500" />
-                  <span>
-                    <b>{language === 'tr' ? 'Durum:' : 'Status:'}</b> {statusLabel}
-                  </span>
-                </div>
-              </div>
+              <button
+                onClick={handleCopyLink}
+                className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                <Copy className="h-4 w-4" />
+                {copied ? 'Kopyalandı' : 'Link Kopyala'}
+              </button>
             </div>
-          </div>
-
-          <div className="p-6">
-            <h1 className="mb-3 text-2xl font-bold text-gray-900">{vehicle.title}</h1>
-            <p className="whitespace-pre-line text-gray-700">{vehicle.description}</p>
           </div>
         </div>
 
-        {isLightboxOpen && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
-            onClick={closeLightbox}
-          >
-            <div
-              className="relative w-full max-w-6xl"
-              onClick={(e) => e.stopPropagation()}
-              onWheel={(e) => {
-                const delta = e.deltaY > 0 ? -0.1 : 0.1;
-                setZoom((z) => Math.min(3, Math.max(1, +(z + delta).toFixed(2))));
-              }}
-            >
-              <div className="absolute left-3 top-3 flex gap-2">
-                <button
-                  className="rounded-lg bg-white/90 px-3 py-2 hover:bg-white"
-                  onClick={() => setZoom((z) => Math.min(3, +(z + 0.2).toFixed(2)))}
-                  type="button"
-                >
-                  +
-                </button>
-                <button
-                  className="rounded-lg bg-white/90 px-3 py-2 hover:bg-white"
-                  onClick={() => setZoom((z) => Math.max(1, +(z - 0.2).toFixed(2)))}
-                  type="button"
-                >
-                  −
-                </button>
-              </div>
+        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+          <div className="grid gap-8 lg:grid-cols-[1.35fr_0.65fr]">
+            <div className="space-y-7">
+              <section className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_10px_35px_rgba(15,23,42,0.08)]">
+                <div className="relative">
+                  <img
+                    src={activeImage}
+                    alt={vehicle.title}
+                    className="h-[280px] w-full object-cover sm:h-[420px] lg:h-[560px]"
+                  />
 
-              <div className="absolute right-3 top-3 flex gap-2">
-                <button
-                  className="rounded-lg bg-white/90 px-3 py-2 hover:bg-white"
-                  onClick={prevImage}
-                  type="button"
-                >
-                  ‹
-                </button>
-                <button
-                  className="rounded-lg bg-white/90 px-3 py-2 hover:bg-white"
-                  onClick={nextImage}
-                  type="button"
-                >
-                  ›
-                </button>
-                <button
-                  className="rounded-lg bg-white/90 px-3 py-2 hover:bg-white"
-                  onClick={closeLightbox}
-                  type="button"
-                >
-                  ✕
-                </button>
-              </div>
+                  <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
 
-              <div className="overflow-hidden rounded-xl bg-black">
-                <img
-                  src={images[selectedImage]}
-                  alt={vehicle.title}
-                  className="h-[80vh] w-full select-none object-contain"
-                  style={{ transform: `scale(${zoom})`, transformOrigin: 'center center' }}
-                  draggable={false}
-                />
-              </div>
+                  <div className="absolute left-4 top-4 flex flex-wrap gap-2">
+                    <span className="rounded-full bg-emerald-500 px-3 py-1 text-xs font-bold text-white shadow">
+                      {mapStatus(vehicle.status)}
+                    </span>
+                    {vehicle.featured && (
+                      <span className="rounded-full bg-amber-400 px-3 py-1 text-xs font-bold text-slate-900 shadow">
+                        Öne Çıkan
+                      </span>
+                    )}
+                  </div>
 
-              <p className="mt-2 text-center text-sm text-white/80">
-                {language === 'tr' ? 'Mouse tekerleği ile zoom' : 'Zoom with mouse wheel'} • {zoom}x
-              </p>
+                  <div className="absolute bottom-4 left-4 right-4 flex items-end justify-between gap-4">
+                    <div>
+                      <h1 className="text-2xl font-bold text-white drop-shadow sm:text-4xl">
+                        {vehicle.title}
+                      </h1>
+                      <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-white/90">
+                        <div className="inline-flex items-center gap-2">
+                          <MapPin className="h-4 w-4" />
+                          {vehicleLocation || 'Konum belirtilmemiş'}
+                        </div>
+                        <div className="inline-flex items-center gap-2">
+                          <CalendarDays className="h-4 w-4" />
+                          {formatDate(vehicle.created_at)}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="hidden rounded-full bg-black/45 px-3 py-1 text-xs font-semibold text-white backdrop-blur sm:block">
+                      {activeImageIndex + 1} / {Math.max(images.length, 1)}
+                    </div>
+                  </div>
+
+                  {images.length > 1 && (
+                    <>
+                      <button
+                        onClick={handlePrevImage}
+                        className="absolute left-4 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur transition hover:bg-black/60"
+                        aria-label="Önceki görsel"
+                      >
+                        <ChevronLeft className="h-5 w-5" />
+                      </button>
+
+                      <button
+                        onClick={handleNextImage}
+                        className="absolute right-4 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur transition hover:bg-black/60"
+                        aria-label="Sonraki görsel"
+                      >
+                        <ChevronRight className="h-5 w-5" />
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                {images.length > 1 && (
+                  <div className="grid grid-cols-4 gap-3 p-4 sm:grid-cols-5 lg:grid-cols-6">
+                    {images.map((image, index) => (
+                      <button
+                        key={`${image}-${index}`}
+                        onClick={() => setActiveImageIndex(index)}
+                        className={`overflow-hidden rounded-2xl ring-2 ring-offset-2 ring-offset-white transition ${
+                          activeImageIndex === index
+                            ? 'ring-slate-900'
+                            : 'ring-transparent hover:ring-slate-300'
+                        }`}
+                      >
+                        <img
+                          src={image}
+                          alt={`${vehicle.title} ${index + 1}`}
+                          className="h-20 w-full object-cover"
+                        />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-[0_10px_35px_rgba(15,23,42,0.06)] sm:p-8">
+                <div className="flex flex-wrap gap-2">
+                  {badges.length > 0 ? (
+                    badges.map((badge) => (
+                      <span
+                        key={badge}
+                        className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700"
+                      >
+                        {badge}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+                      Premium sunumlu araç ilanı
+                    </span>
+                  )}
+                </div>
+
+                <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                  {quickSpecs.map((item) => (
+                    <div
+                      key={item.label}
+                      className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                    >
+                      <div className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-slate-700 shadow-sm ring-1 ring-slate-200">
+                        {item.icon}
+                      </div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        {item.label}
+                      </p>
+                      <p className="mt-1 text-sm font-bold text-slate-900">{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-[0_10px_35px_rgba(15,23,42,0.06)] sm:p-8">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-2xl font-bold text-slate-900">Araç Açıklaması</h2>
+                    <p className="mt-2 text-sm text-slate-500">İlan hakkında detaylı bilgi</p>
+                  </div>
+                </div>
+
+                <div className="mt-6 whitespace-pre-line text-[15px] leading-8 text-slate-700">
+                  {vehicle.description?.trim()
+                    ? vehicle.description
+                    : 'Bu araç için henüz açıklama eklenmemiştir.'}
+                </div>
+              </section>
+
+              <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-[0_10px_35px_rgba(15,23,42,0.06)] sm:p-8">
+                <h2 className="text-2xl font-bold text-slate-900">Teknik ve Ek Bilgiler</h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  Araçla ilgili öne çıkan teknik detaylar
+                </p>
+
+                <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {detailedSpecs.map((item) => (
+                    <div
+                      key={item.label}
+                      className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
+                    >
+                      <div className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-slate-700 shadow-sm ring-1 ring-slate-200">
+                        {item.icon}
+                      </div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                        {item.label}
+                      </p>
+                      <p className="mt-1 text-sm font-bold text-slate-900">{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_10px_35px_rgba(15,23,42,0.06)]">
+                <div className="border-b border-slate-100 p-6 sm:p-8">
+                  <h2 className="text-2xl font-bold text-slate-900">Konum</h2>
+                  <p className="mt-2 text-sm text-slate-500">
+                    {vehicleLocation || 'Konum bilgisi belirtilmemiş.'}
+                  </p>
+                </div>
+
+                <div className="h-[360px] w-full">
+                  <iframe
+                    title="Araç konumu"
+                    src={`https://www.google.com/maps?q=${encodeURIComponent(
+                      vehicleLocation || 'Denizli'
+                    )}&z=14&output=embed`}
+                    className="h-full w-full border-0"
+                    loading="lazy"
+                    referrerPolicy="no-referrer-when-downgrade"
+                  />
+                </div>
+              </section>
+
+              {similarVehicles.length > 0 && (
+                <section className="rounded-[32px] border border-slate-200 bg-white p-6 shadow-[0_10px_35px_rgba(15,23,42,0.06)] sm:p-8">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <h2 className="text-2xl font-bold text-slate-900">Benzer Araçlar</h2>
+                      <p className="mt-2 text-sm text-slate-500">
+                        Aynı şehir veya markaya yakın diğer ilanlar
+                      </p>
+                    </div>
+
+                    {onNavigate ? (
+                      <button
+                        type="button"
+                        onClick={() => onNavigate('vehicles')}
+                        className="hidden items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 sm:inline-flex"
+                      >
+                        Tüm ilanlar
+                        <ExternalLink className="h-4 w-4" />
+                      </button>
+                    ) : (
+                      <Link
+                        to="/vehicles"
+                        className="hidden items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 sm:inline-flex"
+                      >
+                        Tüm ilanlar
+                        <ExternalLink className="h-4 w-4" />
+                      </Link>
+                    )}
+                  </div>
+
+                  <div className="mt-6 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                    {similarVehicles.map((item) => {
+                      const itemImage =
+                        [item.cover_image, ...(item.images || [])].filter(Boolean)[0] ||
+                        '/placeholder.svg';
+
+                      const cardContent = (
+                        <>
+                          <div className="relative overflow-hidden">
+                            <img
+                              src={itemImage}
+                              alt={item.title}
+                              className="h-56 w-full object-cover transition duration-500 group-hover:scale-105"
+                            />
+                            <div className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-slate-900 backdrop-blur">
+                              {mapStatus(item.status)}
+                            </div>
+                          </div>
+
+                          <div className="p-5">
+                            <h3 className="line-clamp-2 text-base font-bold text-slate-900">
+                              {item.title}
+                            </h3>
+
+                            <div className="mt-3 flex items-center gap-2 text-sm text-slate-600">
+                              <MapPin className="h-4 w-4" />
+                              {buildVehicleLocation(item) || 'Konum belirtilmemiş'}
+                            </div>
+
+                            <div className="mt-4 grid grid-cols-2 gap-3">
+                              <div className="rounded-2xl bg-slate-50 p-3">
+                                <p className="text-xs text-slate-500">Yıl</p>
+                                <p className="mt-1 font-bold text-slate-900">
+                                  {item.year || '-'}
+                                </p>
+                              </div>
+                              <div className="rounded-2xl bg-slate-50 p-3">
+                                <p className="text-xs text-slate-500">KM</p>
+                                <p className="mt-1 font-bold text-slate-900">
+                                  {item.mileage ? `${formatNumber(item.mileage)} km` : '-'}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="mt-5 text-xl font-extrabold text-slate-900">
+                              {formatPrice(item.price, item.currency)}
+                            </div>
+                          </div>
+                        </>
+                      );
+
+                      if (onNavigate) {
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => onNavigate('vehicle-detail', item.id)}
+                            className="group overflow-hidden rounded-[28px] border border-slate-200 bg-white text-left transition duration-300 hover:-translate-y-1 hover:shadow-xl"
+                          >
+                            {cardContent}
+                          </button>
+                        );
+                      }
+
+                      return (
+                        <Link
+                          key={item.id}
+                          to={`/vehicles/${item.id}`}
+                          className="group overflow-hidden rounded-[28px] border border-slate-200 bg-white transition duration-300 hover:-translate-y-1 hover:shadow-xl"
+                        >
+                          {cardContent}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
             </div>
+
+            <aside className="space-y-6">
+              <div className="lg:sticky lg:top-6">
+                <div className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_12px_36px_rgba(15,23,42,0.10)]">
+                  <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-6 text-white">
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-300">
+                      Satış Fiyatı
+                    </p>
+                    <div className="mt-3 text-3xl font-extrabold sm:text-4xl">
+                      {formatPrice(vehicle.price, vehicle.currency)}
+                    </div>
+                    <p className="mt-3 text-sm leading-6 text-slate-300">
+                      Güncel fiyat, ekspertiz durumu ve detaylı bilgi için hemen iletişime geçin.
+                    </p>
+                  </div>
+
+                  <div className="space-y-4 p-6">
+                    <a
+                      href={`https://wa.me/${WHATSAPP_NUMBER}?text=${whatsappMessage}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 px-5 py-4 text-sm font-bold text-white transition hover:bg-emerald-600"
+                    >
+                      <MessageCircle className="h-5 w-5" />
+                      WhatsApp ile bilgi al
+                    </a>
+
+                    <a
+                      href={`tel:${PHONE_PRIMARY.replace(/\s/g, '')}`}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm font-bold text-slate-800 transition hover:bg-slate-50"
+                    >
+                      <Phone className="h-5 w-5" />
+                      {PHONE_PRIMARY}
+                    </a>
+
+                    <a
+                      href={`tel:${PHONE_SECONDARY.replace(/\s/g, '')}`}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm font-bold text-slate-800 transition hover:bg-slate-50"
+                    >
+                      <Phone className="h-5 w-5" />
+                      {PHONE_SECONDARY}
+                    </a>
+
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <p className="text-sm font-semibold text-slate-900">{COMPANY_NAME}</p>
+                      <p className="mt-1 text-sm leading-6 text-slate-600">
+                        Güven veren ilan sunumu, hızlı iletişim ve premium kullanıcı deneyimi.
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          İlan Durumu
+                        </p>
+                        <p className="mt-1 text-sm font-bold text-slate-900">
+                          {mapStatus(vehicle.status)}
+                        </p>
+                      </div>
+
+                      <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          Garanti
+                        </p>
+                        <p className="mt-1 text-sm font-bold text-slate-900">
+                          {vehicle.warranty === null
+                            ? 'Belirtilmemiş'
+                            : vehicle.warranty
+                            ? 'Var'
+                            : 'Yok'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </aside>
           </div>
-        )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }

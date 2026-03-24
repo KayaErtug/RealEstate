@@ -1,689 +1,1036 @@
 // src/pages/VehiclesPage.tsx
 import { useEffect, useMemo, useState } from 'react';
-import { Search, SlidersHorizontal, X } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
+import { Link } from 'react-router-dom';
+import {
+  BadgeCheck,
+  Car,
+  ChevronDown,
+  Copy,
+  Filter,
+  Fuel,
+  Gauge,
+  Heart,
+  MapPin,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  SlidersHorizontal,
+  Sparkles,
+  Star,
+  X,
+} from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import type { Vehicle } from '../lib/database.types';
-import VehicleCard from '../components/VehicleCard';
-import { useLanguage } from '../contexts/LanguageContext';
 
-interface VehiclesPageProps {
-  onNavigate: (page: string, vehicleId?: string) => void;
-}
-
-type Lang = 'tr' | 'en';
-
-type VehicleFilterState = {
-  search: string;
+type Vehicle = {
+  id: string;
+  title: string;
+  description: string | null;
   status: string;
-  brand: string;
-  model: string;
-  fuel: string;
-  transmission: string;
-  minYear: string;
-  maxYear: string;
-  minKm: string;
-  maxKm: string;
-  minPrice: string;
-  maxPrice: string;
-  city: string;
+  price: number | null;
+  currency: string | null;
+  location: string | null;
+  city: string | null;
+  district: string | null;
+  brand: string | null;
+  model: string | null;
+  year: number | null;
+  mileage: number | null;
+  fuel_type: string | null;
+  transmission: string | null;
+  engine_power: number | null;
+  engine_volume: number | null;
+  body_type: string | null;
+  color: string | null;
+  traction: string | null;
+  condition: string | null;
+  plate_origin: string | null;
+  exchange: boolean | null;
+  warranty: boolean | null;
+  heavy_damage_record: boolean | null;
+  from_who: string | null;
+  featured: boolean | null;
+  cover_image: string | null;
+  images: string[] | null;
+  created_at: string;
+  slug?: string | null;
 };
 
-export default function VehiclesPage({ onNavigate }: VehiclesPageProps) {
-  const { language, t } = useLanguage() as { language: Lang; t: (k: string) => string };
+type VehiclesPageProps = {
+  onNavigate?: (page: string, id?: string) => void;
+};
 
+type QuickTab = 'all' | 'featured' | 'newest' | 'low-km' | 'warranty' | 'exchange';
+
+type SortOption =
+  | 'newest'
+  | 'oldest'
+  | 'price-desc'
+  | 'price-asc'
+  | 'km-asc'
+  | 'year-desc';
+
+const SITE_URL = 'https://varolgayrimenkul.com';
+const PAGE_TITLE = 'Araç İlanları | Varol Gayrimenkul';
+const PAGE_DESCRIPTION =
+  'Varol Gayrimenkul araç ilanları. Premium araç listeleme deneyimi, detaylı filtreleme, hızlı sekmeler ve modern kullanıcı arayüzü ile güncel ilanları inceleyin.';
+
+function formatPrice(price: number | null, currency: string | null) {
+  if (price === null || price === undefined) return 'Fiyat sorunuz';
+
+  const safeCurrency = currency || 'TRY';
+  const locale =
+    safeCurrency === 'TRY'
+      ? 'tr-TR'
+      : safeCurrency === 'USD'
+      ? 'en-US'
+      : safeCurrency === 'EUR'
+      ? 'de-DE'
+      : 'tr-TR';
+
+  return new Intl.NumberFormat(locale, {
+    style: 'currency',
+    currency: safeCurrency,
+    maximumFractionDigits: 0,
+  }).format(price);
+}
+
+function formatNumber(value: number | null | undefined) {
+  if (value === null || value === undefined) return '-';
+  return new Intl.NumberFormat('tr-TR').format(value);
+}
+
+function formatLocation(vehicle: Vehicle) {
+  return [vehicle.location, vehicle.district, vehicle.city].filter(Boolean).join(', ');
+}
+
+function getMainImage(vehicle: Vehicle) {
+  return [vehicle.cover_image, ...(vehicle.images || [])].filter(Boolean)[0] || '/placeholder.svg';
+}
+
+function mapStatus(value: string | null) {
+  if (!value) return 'İlanda';
+
+  const map: Record<string, string> = {
+    available: 'Satışta',
+    active: 'Aktif',
+    pending: 'Kapora Alındı',
+    passive: 'Pasif',
+    sold: 'Satıldı',
+  };
+
+  return map[value] || value;
+}
+
+function mapFuelType(value: string | null) {
+  if (!value) return 'Belirtilmemiş';
+
+  const map: Record<string, string> = {
+    gasoline: 'Benzin',
+    diesel: 'Dizel',
+    lpg: 'LPG',
+    hybrid: 'Hibrit',
+    electric: 'Elektrikli',
+  };
+
+  return map[value] || value;
+}
+
+function mapTransmission(value: string | null) {
+  if (!value) return 'Belirtilmemiş';
+
+  const map: Record<string, string> = {
+    manual: 'Manuel',
+    automatic: 'Otomatik',
+    semi_automatic: 'Yarı Otomatik',
+  };
+
+  return map[value] || value;
+}
+
+function getVehicleUrl(vehicle: Vehicle) {
+  if (vehicle.slug) return `/arac/${vehicle.slug}`;
+  return `/vehicles/${vehicle.id}`;
+}
+
+function normalizeText(value: string) {
+  return value
+    .toLocaleLowerCase('tr-TR')
+    .replace(/ı/g, 'i')
+    .replace(/ğ/g, 'g')
+    .replace(/ü/g, 'u')
+    .replace(/ş/g, 's')
+    .replace(/ö/g, 'o')
+    .replace(/ç/g, 'c');
+}
+
+export default function VehiclesPage({ onNavigate }: VehiclesPageProps) {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showFilters, setShowFilters] = useState(false);
-
-  const [brandOptions, setBrandOptions] = useState<string[]>([]);
-  const [modelOptions, setModelOptions] = useState<string[]>([]);
-  const [cityOptions, setCityOptions] = useState<string[]>([]);
-
-  const [filters, setFilters] = useState<VehicleFilterState>({
-    search: '',
-    status: 'all',
-    brand: '',
-    model: '',
-    fuel: 'all',
-    transmission: 'all',
-    minYear: '',
-    maxYear: '',
-    minKm: '',
-    maxKm: '',
-    minPrice: '',
-    maxPrice: '',
-    city: '',
-  });
-
-  const safeT = (key: string, trFallback: string, enFallback: string) => {
-    const out = t(key);
-    if (out === key) return language === 'tr' ? trFallback : enFallback;
-    return out;
-  };
-
-  const dictionaries = useMemo(() => {
-    return {
-      status: {
-        all: { tr: 'Tümü', en: 'All' },
-        for_sale: { tr: 'Satılık', en: 'For Sale' },
-        sold: { tr: 'Satıldı', en: 'Sold' },
-      } as Record<string, { tr: string; en: string }>,
-      fuel: {
-        all: { tr: 'Tümü', en: 'All' },
-        gasoline: { tr: 'Benzin', en: 'Gasoline' },
-        diesel: { tr: 'Dizel', en: 'Diesel' },
-        hybrid: { tr: 'Hibrit', en: 'Hybrid' },
-        electric: { tr: 'Elektrik', en: 'Electric' },
-        lpg: { tr: 'LPG', en: 'LPG' },
-      } as Record<string, { tr: string; en: string }>,
-      transmission: {
-        all: { tr: 'Tümü', en: 'All' },
-        automatic: { tr: 'Otomatik', en: 'Automatic' },
-        manual: { tr: 'Manuel', en: 'Manual' },
-        semi_automatic: { tr: 'Yarı Otomatik', en: 'Semi-automatic' },
-        tiptronic: { tr: 'Tiptronic', en: 'Tiptronic' },
-      } as Record<string, { tr: string; en: string }>,
-    };
-  }, []);
-
-  const labelFrom = (dict: Record<string, { tr: string; en: string }>, value?: string) => {
-    if (!value) return '-';
-    return dict[value]?.[language] ?? value;
-  };
+  const [activeQuickTab, setActiveQuickTab] = useState<QuickTab>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedBrand, setSelectedBrand] = useState('all');
+  const [selectedFuel, setSelectedFuel] = useState('all');
+  const [selectedTransmission, setSelectedTransmission] = useState('all');
+  const [selectedCity, setSelectedCity] = useState('all');
+  const [sortBy, setSortBy] = useState<SortOption>('newest');
+  const [favorites, setFavorites] = useState<Record<string, boolean>>({});
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   useEffect(() => {
-    void loadVehicles();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters]);
-
-  useEffect(() => {
-    void loadFilterOptions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const loadFilterOptions = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('vehicles')
-        .select('brand, model, city')
-        .eq('moderation_status', 'approved');
-
-      if (error) throw error;
-
-      const rows = (data ?? []) as Array<Pick<Vehicle, 'brand' | 'model' | 'city'>>;
-
-      const brands = new Set<string>();
-      const models = new Set<string>();
-      const cities = new Set<string>();
-
-      rows.forEach((v) => {
-        if (v.brand) brands.add(String(v.brand).trim());
-        if (v.model) models.add(String(v.model).trim());
-        if (v.city) cities.add(String(v.city).trim());
-      });
-
-      setBrandOptions(Array.from(brands).sort((a, b) => a.localeCompare(b)));
-      setModelOptions(Array.from(models).sort((a, b) => a.localeCompare(b)));
-      setCityOptions(Array.from(cities).sort((a, b) => a.localeCompare(b)));
-    } catch (err) {
-      console.error('Error loading vehicle filter options:', err);
-    }
-  };
-
-  const loadVehicles = async () => {
-    try {
+    async function fetchVehicles() {
       setLoading(true);
 
-      let query = supabase
+      const { data, error } = await supabase
         .from('vehicles')
         .select('*')
-        .eq('moderation_status', 'approved')
+        .order('featured', { ascending: false })
         .order('created_at', { ascending: false });
 
-      if (filters.search) {
-        const s = filters.search.trim();
-        if (s) {
-          query = query.or(
-            `title.ilike.%${s}%,brand.ilike.%${s}%,model.ilike.%${s}%,city.ilike.%${s}%,district.ilike.%${s}%`
-          );
-        }
+      if (error || !data) {
+        setVehicles([]);
+        setLoading(false);
+        return;
       }
 
-      if (filters.status !== 'all') query = query.eq('status', filters.status);
-      if (filters.brand) query = query.ilike('brand', `%${filters.brand}%`);
-      if (filters.model) query = query.ilike('model', `%${filters.model}%`);
-      if (filters.city) query = query.ilike('city', `%${filters.city}%`);
-      if (filters.fuel !== 'all') query = query.eq('fuel', filters.fuel);
-      if (filters.transmission !== 'all') query = query.eq('transmission', filters.transmission);
-
-      if (filters.minYear) query = query.gte('year', parseInt(filters.minYear, 10));
-      if (filters.maxYear) query = query.lte('year', parseInt(filters.maxYear, 10));
-      if (filters.minKm) query = query.gte('km', parseInt(filters.minKm, 10));
-      if (filters.maxKm) query = query.lte('km', parseInt(filters.maxKm, 10));
-      if (filters.minPrice) query = query.gte('price', parseFloat(filters.minPrice));
-      if (filters.maxPrice) query = query.lte('price', parseFloat(filters.maxPrice));
-
-      const { data, error } = await query;
-      if (error) throw error;
-
-      setVehicles((data ?? []) as Vehicle[]);
-    } catch (error) {
-      console.error('Error loading vehicles:', error);
-      setVehicles([]);
-    } finally {
+      setVehicles((data as Vehicle[]) || []);
       setLoading(false);
     }
-  };
 
-  const handleFilterChange = (key: keyof VehicleFilterState, value: string) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
-  };
+    fetchVehicles();
+  }, []);
 
-  const clearFilters = () => {
-    setFilters({
-      search: '',
-      status: 'all',
-      brand: '',
-      model: '',
-      fuel: 'all',
-      transmission: 'all',
-      minYear: '',
-      maxYear: '',
-      minKm: '',
-      maxKm: '',
-      minPrice: '',
-      maxPrice: '',
-      city: '',
+  useEffect(() => {
+    const nextFavorites: Record<string, boolean> = {};
+
+    vehicles.forEach((vehicle) => {
+      nextFavorites[vehicle.id] = localStorage.getItem(`favorite_vehicle_${vehicle.id}`) === 'true';
     });
-  };
 
-  const hasActiveFilters = Object.entries(filters).some(
-    ([key, value]) => key !== 'search' && value !== '' && value !== 'all'
-  );
-
-  const pageTitle = useMemo(() => {
-    if (language === 'tr') {
-      if (filters.brand.trim()) {
-        return `${filters.brand.trim()} Araç İlanları | Varol Gayrimenkul`;
-      }
-      return 'Araç İlanları | Varol Gayrimenkul';
-    }
-
-    if (filters.brand.trim()) {
-      return `${filters.brand.trim()} Vehicle Listings | Varol Real Estate`;
-    }
-    return 'Vehicle Listings | Varol Real Estate';
-  }, [language, filters.brand]);
-
-  const pageDescription = useMemo(() => {
-    if (language === 'tr') {
-      const parts: string[] = [];
-
-      if (filters.brand.trim()) parts.push(`${filters.brand.trim()} marka`);
-      if (filters.model.trim()) parts.push(`${filters.model.trim()} model`);
-      if (filters.city.trim()) parts.push(`${filters.city.trim()} bölgesindeki`);
-      if (filters.status === 'for_sale') parts.push('satılık');
-      if (filters.status === 'sold') parts.push('satılmış');
-
-      parts.push('araç ilanlarını inceleyin.');
-      parts.push(`Toplam ${vehicles.length} araç ilanı listeleniyor.`);
-
-      return parts.join(' ');
-    }
-
-    const parts: string[] = [];
-
-    if (filters.brand.trim()) parts.push(`${filters.brand.trim()} brand`);
-    if (filters.model.trim()) parts.push(`${filters.model.trim()} model`);
-    if (filters.city.trim()) parts.push(`in ${filters.city.trim()}`);
-    if (filters.status === 'for_sale') parts.push('for sale');
-    if (filters.status === 'sold') parts.push('sold');
-
-    parts.push('vehicle listings.');
-    parts.push(`Total ${vehicles.length} vehicle listings are displayed.`);
-
-    return parts.join(' ');
-  }, [language, filters.brand, filters.model, filters.city, filters.status, vehicles.length]);
-
-  const canonicalUrl = useMemo(() => {
-    const params = new URLSearchParams();
-
-    if (filters.search) params.set('search', filters.search);
-    if (filters.status !== 'all') params.set('status', filters.status);
-    if (filters.brand) params.set('brand', filters.brand);
-    if (filters.model) params.set('model', filters.model);
-    if (filters.fuel !== 'all') params.set('fuel', filters.fuel);
-    if (filters.transmission !== 'all') params.set('transmission', filters.transmission);
-    if (filters.minYear) params.set('minYear', filters.minYear);
-    if (filters.maxYear) params.set('maxYear', filters.maxYear);
-    if (filters.minKm) params.set('minKm', filters.minKm);
-    if (filters.maxKm) params.set('maxKm', filters.maxKm);
-    if (filters.minPrice) params.set('minPrice', filters.minPrice);
-    if (filters.maxPrice) params.set('maxPrice', filters.maxPrice);
-    if (filters.city) params.set('city', filters.city);
-
-    const query = params.toString();
-    return query
-      ? `${window.location.origin}/vehicles?${query}`
-      : `${window.location.origin}/vehicles`;
-  }, [filters]);
-
-  const pageImage = useMemo(() => {
-    const firstWithImage = vehicles.find(
-      (vehicle) => Array.isArray(vehicle.images) && vehicle.images.length > 0 && Boolean(vehicle.images[0])
-    );
-
-    return firstWithImage?.images?.[0] || `${window.location.origin}/logo_varol.png`;
+    setFavorites(nextFavorites);
   }, [vehicles]);
 
-  const breadcrumbSchema = useMemo(() => {
-    return JSON.stringify({
-      '@context': 'https://schema.org',
-      '@type': 'BreadcrumbList',
-      itemListElement: [
-        {
-          '@type': 'ListItem',
-          position: 1,
-          name: language === 'tr' ? 'Ana Sayfa' : 'Home',
-          item: `${window.location.origin}/`,
-        },
-        {
-          '@type': 'ListItem',
-          position: 2,
-          name: language === 'tr' ? 'Araç İlanları' : 'Vehicle Listings',
-          item: `${window.location.origin}/vehicles`,
-        },
-      ],
-    });
-  }, [language]);
+  const brandOptions = useMemo(() => {
+    return ['all', ...Array.from(new Set(vehicles.map((v) => v.brand).filter(Boolean) as string[]))];
+  }, [vehicles]);
 
-  const collectionPageSchema = useMemo(() => {
-    return JSON.stringify({
-      '@context': 'https://schema.org',
-      '@type': 'CollectionPage',
-      name: pageTitle,
-      description: pageDescription,
-      url: canonicalUrl,
-      inLanguage: language === 'tr' ? 'tr-TR' : 'en-US',
-      isPartOf: {
-        '@type': 'WebSite',
-        name: 'Varol Gayrimenkul',
-        url: window.location.origin,
-      },
-      about: {
-        '@type': 'Thing',
-        name: language === 'tr' ? 'Araç İlanları' : 'Vehicle Listings',
-      },
-      mainEntity: {
-        '@type': 'ItemList',
-        numberOfItems: vehicles.length,
-      },
-    });
-  }, [pageTitle, pageDescription, canonicalUrl, language, vehicles.length]);
+  const fuelOptions = useMemo(() => {
+    return [
+      'all',
+      ...Array.from(new Set(vehicles.map((v) => v.fuel_type).filter(Boolean) as string[])),
+    ];
+  }, [vehicles]);
 
-  const itemListSchema = useMemo(() => {
-    const itemListElement = vehicles.slice(0, 50).map((vehicle, index) => {
-      const firstImage =
-        Array.isArray(vehicle.images) && vehicle.images.length > 0 ? vehicle.images[0] : undefined;
+  const transmissionOptions = useMemo(() => {
+    return [
+      'all',
+      ...Array.from(new Set(vehicles.map((v) => v.transmission).filter(Boolean) as string[])),
+    ];
+  }, [vehicles]);
 
-      return {
-        '@type': 'ListItem',
-        position: index + 1,
-        url: `${window.location.origin}/vehicles/${vehicle.id}`,
-        name: vehicle.title,
-        item: {
-          '@type': 'Car',
-          name: vehicle.title,
-          brand: {
-            '@type': 'Brand',
-            name: vehicle.brand,
-          },
-          model: vehicle.model,
-          vehicleModelDate: String(vehicle.year),
-          image: firstImage ? [firstImage] : undefined,
-          description: vehicle.description,
-          offers: {
-            '@type': 'Offer',
-            price: vehicle.price,
-            priceCurrency: vehicle.currency,
-            availability:
-              vehicle.status === 'sold'
-                ? 'https://schema.org/SoldOut'
-                : 'https://schema.org/InStock',
-            url: `${window.location.origin}/vehicles/${vehicle.id}`,
-          },
-        },
-      };
-    });
+  const cityOptions = useMemo(() => {
+    return ['all', ...Array.from(new Set(vehicles.map((v) => v.city).filter(Boolean) as string[]))];
+  }, [vehicles]);
 
-    return JSON.stringify({
-      '@context': 'https://schema.org',
-      '@type': 'ItemList',
-      name: language === 'tr' ? 'Araç İlanları' : 'Vehicle Listings',
-      numberOfItems: vehicles.length,
-      itemListOrder: 'https://schema.org/ItemListOrderAscending',
-      itemListElement,
-    });
-  }, [vehicles, language]);
+  const activeVehicles = useMemo(() => {
+    return vehicles.filter((vehicle) => vehicle.status !== 'passive');
+  }, [vehicles]);
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <Helmet>
-        <html lang={language === 'tr' ? 'tr' : 'en'} />
-        <title>{pageTitle}</title>
-        <meta name="description" content={pageDescription} />
-        <meta name="robots" content="index, follow, max-image-preview:large" />
-        <link rel="canonical" href={canonicalUrl} />
+  const filteredVehicles = useMemo(() => {
+    let result = [...activeVehicles];
 
-        <meta property="og:title" content={pageTitle} />
-        <meta property="og:description" content={pageDescription} />
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content={canonicalUrl} />
-        <meta property="og:site_name" content="Varol Gayrimenkul" />
-        <meta property="og:locale" content={language === 'tr' ? 'tr_TR' : 'en_US'} />
-        <meta property="og:image" content={pageImage} />
+    if (activeQuickTab === 'featured') {
+      result = result.filter((vehicle) => vehicle.featured);
+    }
 
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content={pageTitle} />
-        <meta name="twitter:description" content={pageDescription} />
-        <meta name="twitter:image" content={pageImage} />
+    if (activeQuickTab === 'low-km') {
+      result = result.filter(
+        (vehicle) => typeof vehicle.mileage === 'number' && vehicle.mileage <= 100000
+      );
+    }
 
-        <script type="application/ld+json">{breadcrumbSchema}</script>
-        <script type="application/ld+json">{collectionPageSchema}</script>
-        <script type="application/ld+json">{itemListSchema}</script>
-      </Helmet>
+    if (activeQuickTab === 'warranty') {
+      result = result.filter((vehicle) => vehicle.warranty === true);
+    }
 
-      <div className="bg-white shadow-sm">
-        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-          <h1 className="mb-4 text-3xl font-bold text-gray-900">
-            {language === 'tr' ? 'Araç İlanları' : 'Vehicle Listings'}
-          </h1>
+    if (activeQuickTab === 'exchange') {
+      result = result.filter((vehicle) => vehicle.exchange === true);
+    }
 
-          <div className="mb-4 flex gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder={
-                  language === 'tr'
-                    ? 'Marka, model, şehir veya ilan ara...'
-                    : 'Search brand, model, city or listing...'
-                }
-                value={filters.search}
-                onChange={(e) => handleFilterChange('search', e.target.value)}
-                className="w-full rounded-lg border border-gray-300 py-2 pl-10 pr-4 focus:border-transparent focus:ring-2 focus:ring-cta"
-              />
-            </div>
+    if (activeQuickTab === 'newest') {
+      result = result.filter((vehicle) => {
+        const createdTime = new Date(vehicle.created_at).getTime();
+        const last30Days = Date.now() - 1000 * 60 * 60 * 24 * 30;
+        return createdTime >= last30Days;
+      });
+    }
+
+    if (selectedBrand !== 'all') {
+      result = result.filter((vehicle) => vehicle.brand === selectedBrand);
+    }
+
+    if (selectedFuel !== 'all') {
+      result = result.filter((vehicle) => vehicle.fuel_type === selectedFuel);
+    }
+
+    if (selectedTransmission !== 'all') {
+      result = result.filter((vehicle) => vehicle.transmission === selectedTransmission);
+    }
+
+    if (selectedCity !== 'all') {
+      result = result.filter((vehicle) => vehicle.city === selectedCity);
+    }
+
+    if (searchTerm.trim()) {
+      const normalizedQuery = normalizeText(searchTerm.trim());
+
+      result = result.filter((vehicle) => {
+        const haystack = normalizeText(
+          [
+            vehicle.title,
+            vehicle.brand,
+            vehicle.model,
+            vehicle.city,
+            vehicle.district,
+            vehicle.location,
+            vehicle.body_type,
+            vehicle.color,
+            vehicle.description || '',
+          ]
+            .filter(Boolean)
+            .join(' ')
+        );
+
+        return haystack.includes(normalizedQuery);
+      });
+    }
+
+    switch (sortBy) {
+      case 'oldest':
+        result.sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
+        break;
+      case 'price-desc':
+        result.sort((a, b) => (b.price || 0) - (a.price || 0));
+        break;
+      case 'price-asc':
+        result.sort((a, b) => {
+          const aPrice = a.price ?? Number.MAX_SAFE_INTEGER;
+          const bPrice = b.price ?? Number.MAX_SAFE_INTEGER;
+          return aPrice - bPrice;
+        });
+        break;
+      case 'km-asc':
+        result.sort((a, b) => {
+          const aMileage = a.mileage ?? Number.MAX_SAFE_INTEGER;
+          const bMileage = b.mileage ?? Number.MAX_SAFE_INTEGER;
+          return aMileage - bMileage;
+        });
+        break;
+      case 'year-desc':
+        result.sort((a, b) => (b.year || 0) - (a.year || 0));
+        break;
+      case 'newest':
+      default:
+        result.sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        break;
+    }
+
+    return result;
+  }, [
+    activeQuickTab,
+    activeVehicles,
+    searchTerm,
+    selectedBrand,
+    selectedFuel,
+    selectedTransmission,
+    selectedCity,
+    sortBy,
+  ]);
+
+  const stats = useMemo(() => {
+    return {
+      total: activeVehicles.length,
+      featured: activeVehicles.filter((vehicle) => vehicle.featured).length,
+      warranty: activeVehicles.filter((vehicle) => vehicle.warranty).length,
+      exchange: activeVehicles.filter((vehicle) => vehicle.exchange).length,
+    };
+  }, [activeVehicles]);
+
+  const activeFilterCount = [
+    selectedBrand !== 'all',
+    selectedFuel !== 'all',
+    selectedTransmission !== 'all',
+    selectedCity !== 'all',
+    searchTerm.trim() !== '',
+    activeQuickTab !== 'all',
+  ].filter(Boolean).length;
+
+  const resetFilters = () => {
+    setActiveQuickTab('all');
+    setSearchTerm('');
+    setSelectedBrand('all');
+    setSelectedFuel('all');
+    setSelectedTransmission('all');
+    setSelectedCity('all');
+    setSortBy('newest');
+  };
+
+  const toggleFavorite = (vehicleId: string) => {
+    const nextValue = !favorites[vehicleId];
+    localStorage.setItem(`favorite_vehicle_${vehicleId}`, String(nextValue));
+    setFavorites((prev) => ({ ...prev, [vehicleId]: nextValue }));
+  };
+
+  const copyVehicleLink = async (vehicle: Vehicle) => {
+    try {
+      const url = `${window.location.origin}${getVehicleUrl(vehicle)}`;
+      await navigator.clipboard.writeText(url);
+      setCopiedId(vehicle.id);
+      window.setTimeout(() => setCopiedId(null), 1800);
+    } catch {
+      setCopiedId(null);
+    }
+  };
+
+  const renderVehicleCard = (vehicle: Vehicle) => {
+    const cardBody = (
+      <>
+        <div className="relative overflow-hidden">
+          <img
+            src={getMainImage(vehicle)}
+            alt={vehicle.title}
+            className="h-56 w-full object-cover transition duration-500 group-hover:scale-105"
+          />
+
+          <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
+
+          <div className="absolute left-3 top-3 flex flex-wrap gap-2">
+            <span className="rounded-full bg-emerald-500 px-3 py-1 text-[11px] font-bold text-white shadow">
+              {mapStatus(vehicle.status)}
+            </span>
+
+            {vehicle.featured && (
+              <span className="rounded-full bg-amber-400 px-3 py-1 text-[11px] font-bold text-slate-900 shadow">
+                Öne Çıkan
+              </span>
+            )}
+          </div>
+
+          <div className="absolute right-3 top-3 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                toggleFavorite(vehicle.id);
+              }}
+              className={`inline-flex h-10 w-10 items-center justify-center rounded-full backdrop-blur transition ${
+                favorites[vehicle.id]
+                  ? 'bg-rose-500 text-white'
+                  : 'bg-white/85 text-slate-700 hover:bg-white'
+              }`}
+              aria-label="Favori"
+            >
+              <Heart className={`h-4 w-4 ${favorites[vehicle.id] ? 'fill-current' : ''}`} />
+            </button>
 
             <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-2 rounded-lg border px-4 py-2 transition-colors ${
-                showFilters || hasActiveFilters
-                  ? 'border-brand bg-cta text-white'
-                  : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-              }`}
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                void copyVehicleLink(vehicle);
+              }}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/85 text-slate-700 backdrop-blur transition hover:bg-white"
+              aria-label="Bağlantıyı kopyala"
             >
-              <SlidersHorizontal className="h-5 w-5" />
-              <span className="hidden sm:inline">{language === 'tr' ? 'Filtrele' : 'Filters'}</span>
-              {hasActiveFilters && (
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-brand">
-                  !
-                </span>
-              )}
+              <Copy className="h-4 w-4" />
             </button>
           </div>
 
-          {showFilters && (
-            <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
-              <div className="mb-4 flex items-center justify-between">
-                <h3 className="font-semibold text-gray-900">{language === 'tr' ? 'Filtreler' : 'Filters'}</h3>
-                {hasActiveFilters && (
-                  <button
-                    onClick={clearFilters}
-                    className="flex items-center gap-1 text-sm text-brand hover:text-brand-hover"
-                  >
-                    <X className="h-4 w-4" />
-                    {language === 'tr' ? 'Filtreleri Temizle' : 'Clear filters'}
-                  </button>
-                )}
+          <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-3">
+            <div className="rounded-full bg-black/45 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur">
+              {vehicle.year || 'Yıl yok'}
+            </div>
+
+            {copiedId === vehicle.id && (
+              <div className="rounded-full bg-white px-3 py-1 text-[11px] font-bold text-slate-900 shadow">
+                Link kopyalandı
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="p-5">
+          <div className="mb-3 flex flex-wrap gap-2">
+            {vehicle.brand && (
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-700">
+                {vehicle.brand}
+              </span>
+            )}
+            {vehicle.model && (
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-bold text-slate-700">
+                {vehicle.model}
+              </span>
+            )}
+          </div>
+
+          <h3 className="line-clamp-2 min-h-[56px] text-lg font-bold leading-7 text-slate-900">
+            {vehicle.title}
+          </h3>
+
+          <div className="mt-3 flex items-center gap-2 text-sm text-slate-600">
+            <MapPin className="h-4 w-4 shrink-0" />
+            <span className="line-clamp-1">{formatLocation(vehicle) || 'Konum belirtilmemiş'}</span>
+          </div>
+
+          <div className="mt-5 grid grid-cols-2 gap-3">
+            <div className="rounded-2xl bg-slate-50 p-3">
+              <div className="flex items-center gap-2 text-slate-500">
+                <Gauge className="h-4 w-4" />
+                <p className="text-xs">Kilometre</p>
+              </div>
+              <p className="mt-1 text-sm font-bold text-slate-900">
+                {vehicle.mileage ? `${formatNumber(vehicle.mileage)} km` : '-'}
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-slate-50 p-3">
+              <div className="flex items-center gap-2 text-slate-500">
+                <Fuel className="h-4 w-4" />
+                <p className="text-xs">Yakıt</p>
+              </div>
+              <p className="mt-1 text-sm font-bold text-slate-900">
+                {mapFuelType(vehicle.fuel_type)}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            <div className="rounded-2xl bg-slate-50 p-3">
+              <div className="flex items-center gap-2 text-slate-500">
+                <ShieldCheck className="h-4 w-4" />
+                <p className="text-xs">Vites</p>
+              </div>
+              <p className="mt-1 text-sm font-bold text-slate-900">
+                {mapTransmission(vehicle.transmission)}
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-slate-50 p-3">
+              <div className="flex items-center gap-2 text-slate-500">
+                <Sparkles className="h-4 w-4" />
+                <p className="text-xs">Durum</p>
+              </div>
+              <p className="mt-1 text-sm font-bold text-slate-900">
+                {vehicle.condition === 'new'
+                  ? 'Sıfır'
+                  : vehicle.condition === 'used'
+                  ? 'İkinci El'
+                  : 'Belirtilmemiş'}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 flex flex-wrap gap-2">
+            {vehicle.warranty && (
+              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-700">
+                Garantili
+              </span>
+            )}
+            {vehicle.exchange && (
+              <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[11px] font-semibold text-sky-700">
+                Takas Var
+              </span>
+            )}
+            {vehicle.heavy_damage_record === false && (
+              <span className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-semibold text-violet-700">
+                Ağır Hasar Kaydı Yok
+              </span>
+            )}
+          </div>
+
+          <div className="mt-6 flex items-end justify-between gap-4 border-t border-slate-100 pt-5">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-slate-500">Fiyat</p>
+              <p className="mt-1 text-2xl font-extrabold text-slate-900">
+                {formatPrice(vehicle.price, vehicle.currency)}
+              </p>
+            </div>
+
+            <div className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition group-hover:bg-slate-800">
+              İncele
+            </div>
+          </div>
+        </div>
+      </>
+    );
+
+    if (onNavigate) {
+      return (
+        <button
+          key={vehicle.id}
+          type="button"
+          onClick={() => onNavigate('vehicle-detail', vehicle.id)}
+          className="group overflow-hidden rounded-[28px] border border-slate-200 bg-white text-left shadow-[0_10px_30px_rgba(15,23,42,0.05)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_18px_50px_rgba(15,23,42,0.10)]"
+        >
+          {cardBody}
+        </button>
+      );
+    }
+
+    return (
+      <Link
+        key={vehicle.id}
+        to={getVehicleUrl(vehicle)}
+        className="group overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.05)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_18px_50px_rgba(15,23,42,0.10)]"
+      >
+        {cardBody}
+      </Link>
+    );
+  };
+
+  return (
+    <>
+      <Helmet>
+        <title>{PAGE_TITLE}</title>
+        <meta name="description" content={PAGE_DESCRIPTION} />
+        <link rel="canonical" href={`${SITE_URL}/vehicles`} />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content={PAGE_TITLE} />
+        <meta property="og:description" content={PAGE_DESCRIPTION} />
+        <meta property="og:url" content={`${SITE_URL}/vehicles`} />
+        <meta property="og:site_name" content="Varol Gayrimenkul" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={PAGE_TITLE} />
+        <meta name="twitter:description" content={PAGE_DESCRIPTION} />
+      </Helmet>
+
+      <div className="min-h-screen bg-gradient-to-b from-slate-100 via-white to-slate-50">
+        <section className="border-b border-slate-200 bg-white/80 backdrop-blur">
+          <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+            <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
+              <div>
+                <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm">
+                  <Car className="h-4 w-4" />
+                  Premium Araç İlanları
+                </div>
+
+                <h1 className="text-3xl font-black tracking-tight text-slate-900 sm:text-5xl">
+                  Sahibinden kalitesinde
+                  <span className="block text-slate-600">araç listeleme deneyimi</span>
+                </h1>
+
+                <p className="mt-4 max-w-2xl text-base leading-8 text-slate-600 sm:text-lg">
+                  Güncel araç ilanlarını hızlı filtrelerle, premium kart tasarımıyla ve güçlü
+                  detay akışıyla inceleyin.
+                </p>
               </div>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    {language === 'tr' ? 'Durum' : 'Status'}
-                  </label>
-                  <select
-                    value={filters.status}
-                    onChange={(e) => handleFilterChange('status', e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-cta"
-                  >
-                    <option value="all">{labelFrom(dictionaries.status, 'all')}</option>
-                    <option value="for_sale">{labelFrom(dictionaries.status, 'for_sale')}</option>
-                    <option value="sold">{labelFrom(dictionaries.status, 'sold')}</option>
-                  </select>
+              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-100 text-slate-700">
+                    <BadgeCheck className="h-5 w-5" />
+                  </div>
+                  <p className="mt-4 text-sm text-slate-500">Toplam İlan</p>
+                  <p className="mt-1 text-2xl font-black text-slate-900">{stats.total}</p>
                 </div>
 
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    {language === 'tr' ? 'Marka' : 'Brand'}
-                  </label>
-                  <input
-                    list="brandOptions"
-                    type="text"
-                    placeholder={language === 'tr' ? 'Örn: BMW' : 'e.g. BMW'}
-                    value={filters.brand}
-                    onChange={(e) => handleFilterChange('brand', e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-cta"
-                  />
-                  <datalist id="brandOptions">
-                    {brandOptions.slice(0, 250).map((b) => (
-                      <option key={b} value={b} />
-                    ))}
-                  </datalist>
+                <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+                    <Star className="h-5 w-5" />
+                  </div>
+                  <p className="mt-4 text-sm text-slate-500">Öne Çıkan</p>
+                  <p className="mt-1 text-2xl font-black text-slate-900">{stats.featured}</p>
                 </div>
 
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    {language === 'tr' ? 'Model' : 'Model'}
-                  </label>
-                  <input
-                    list="modelOptions"
-                    type="text"
-                    placeholder={language === 'tr' ? 'Örn: 3 Serisi' : 'e.g. 3 Series'}
-                    value={filters.model}
-                    onChange={(e) => handleFilterChange('model', e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-cta"
-                  />
-                  <datalist id="modelOptions">
-                    {modelOptions.slice(0, 300).map((m) => (
-                      <option key={m} value={m} />
-                    ))}
-                  </datalist>
+                <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
+                    <ShieldCheck className="h-5 w-5" />
+                  </div>
+                  <p className="mt-4 text-sm text-slate-500">Garantili</p>
+                  <p className="mt-1 text-2xl font-black text-slate-900">{stats.warranty}</p>
                 </div>
 
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    {language === 'tr' ? 'Şehir' : 'City'}
-                  </label>
-                  <input
-                    list="cityOptions"
-                    type="text"
-                    placeholder={language === 'tr' ? 'Şehir' : 'City'}
-                    value={filters.city}
-                    onChange={(e) => handleFilterChange('city', e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-cta"
-                  />
-                  <datalist id="cityOptions">
-                    {cityOptions.slice(0, 250).map((c) => (
-                      <option key={c} value={c} />
-                    ))}
-                  </datalist>
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    {language === 'tr' ? 'Yakıt' : 'Fuel'}
-                  </label>
-                  <select
-                    value={filters.fuel}
-                    onChange={(e) => handleFilterChange('fuel', e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-cta"
-                  >
-                    <option value="all">{labelFrom(dictionaries.fuel, 'all')}</option>
-                    <option value="gasoline">{labelFrom(dictionaries.fuel, 'gasoline')}</option>
-                    <option value="diesel">{labelFrom(dictionaries.fuel, 'diesel')}</option>
-                    <option value="hybrid">{labelFrom(dictionaries.fuel, 'hybrid')}</option>
-                    <option value="electric">{labelFrom(dictionaries.fuel, 'electric')}</option>
-                    <option value="lpg">{labelFrom(dictionaries.fuel, 'lpg')}</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    {language === 'tr' ? 'Vites' : 'Transmission'}
-                  </label>
-                  <select
-                    value={filters.transmission}
-                    onChange={(e) => handleFilterChange('transmission', e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-cta"
-                  >
-                    <option value="all">{labelFrom(dictionaries.transmission, 'all')}</option>
-                    <option value="automatic">{labelFrom(dictionaries.transmission, 'automatic')}</option>
-                    <option value="manual">{labelFrom(dictionaries.transmission, 'manual')}</option>
-                    <option value="semi_automatic">
-                      {labelFrom(dictionaries.transmission, 'semi_automatic')}
-                    </option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    {language === 'tr' ? 'Min Yıl' : 'Min year'}
-                  </label>
-                  <input
-                    type="number"
-                    placeholder="Min"
-                    value={filters.minYear}
-                    onChange={(e) => handleFilterChange('minYear', e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-cta"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    {language === 'tr' ? 'Max Yıl' : 'Max year'}
-                  </label>
-                  <input
-                    type="number"
-                    placeholder="Max"
-                    value={filters.maxYear}
-                    onChange={(e) => handleFilterChange('maxYear', e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-cta"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    {language === 'tr' ? 'Min KM' : 'Min km'}
-                  </label>
-                  <input
-                    type="number"
-                    placeholder="Min"
-                    value={filters.minKm}
-                    onChange={(e) => handleFilterChange('minKm', e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-cta"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    {language === 'tr' ? 'Max KM' : 'Max km'}
-                  </label>
-                  <input
-                    type="number"
-                    placeholder="Max"
-                    value={filters.maxKm}
-                    onChange={(e) => handleFilterChange('maxKm', e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-cta"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    {language === 'tr' ? 'Min Fiyat' : 'Min price'}
-                  </label>
-                  <input
-                    type="number"
-                    placeholder="Min"
-                    value={filters.minPrice}
-                    onChange={(e) => handleFilterChange('minPrice', e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-cta"
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">
-                    {language === 'tr' ? 'Max Fiyat' : 'Max price'}
-                  </label>
-                  <input
-                    type="number"
-                    placeholder="Max"
-                    value={filters.maxPrice}
-                    onChange={(e) => handleFilterChange('maxPrice', e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-cta"
-                  />
+                <div className="rounded-[24px] border border-slate-200 bg-white p-5 shadow-sm">
+                  <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-100 text-sky-700">
+                    <RefreshCw className="h-5 w-5" />
+                  </div>
+                  <p className="mt-4 text-sm text-slate-500">Takaslı</p>
+                  <p className="mt-1 text-2xl font-black text-slate-900">{stats.exchange}</p>
                 </div>
               </div>
             </div>
-          )}
-        </div>
-      </div>
-
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {loading ? (
-          <div className="py-12 text-center text-gray-600">
-            {safeT('common.loading', 'Yükleniyor...', 'Loading...')}
           </div>
-        ) : vehicles.length > 0 ? (
-          <>
-            <div className="mb-6 text-gray-600">
-              {language === 'tr' ? (
-                <>
-                  Toplam <span className="font-semibold">{vehicles.length}</span> araç ilanı bulundu
-                </>
-              ) : (
-                <>
-                  Found <span className="font-semibold">{vehicles.length}</span> vehicle listings
-                </>
+        </section>
+
+        <section className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+          <div className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+              <div className="relative w-full xl:max-w-xl">
+                <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  placeholder="Marka, model, şehir veya ilan başlığı ara..."
+                  className="h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-12 pr-4 text-sm font-medium text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-slate-300 focus:bg-white"
+                />
+              </div>
+
+              <div className="hidden flex-wrap items-center gap-3 lg:flex">
+                {[
+                  { key: 'all', label: 'Tümü' },
+                  { key: 'featured', label: 'Öne Çıkanlar' },
+                  { key: 'newest', label: 'Yeni İlanlar' },
+                  { key: 'low-km', label: 'Düşük KM' },
+                  { key: 'warranty', label: 'Garantili' },
+                  { key: 'exchange', label: 'Takaslı' },
+                ].map((tab) => {
+                  const isActive = activeQuickTab === tab.key;
+
+                  return (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      onClick={() => setActiveQuickTab(tab.key as QuickTab)}
+                      className={`rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+                        isActive
+                          ? 'bg-slate-900 text-white shadow-sm'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center gap-3 lg:hidden">
+                <button
+                  type="button"
+                  onClick={() => setMobileFiltersOpen((prev) => !prev)}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
+                >
+                  <Filter className="h-4 w-4" />
+                  Filtreler
+                  {activeFilterCount > 0 && (
+                    <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-slate-900 px-2 text-xs text-white">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </button>
+
+                <div className="relative flex-1">
+                  <select
+                    value={sortBy}
+                    onChange={(event) => setSortBy(event.target.value as SortOption)}
+                    className="h-12 w-full appearance-none rounded-2xl border border-slate-200 bg-white pl-4 pr-10 text-sm font-semibold text-slate-700 outline-none"
+                  >
+                    <option value="newest">En Yeni</option>
+                    <option value="oldest">En Eski</option>
+                    <option value="price-desc">Fiyat Azalan</option>
+                    <option value="price-asc">Fiyat Artan</option>
+                    <option value="km-asc">KM Azalan</option>
+                    <option value="year-desc">Model Yılı</option>
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 hidden grid-cols-1 gap-4 border-t border-slate-100 pt-4 md:grid md:grid-cols-2 xl:grid-cols-5">
+              <div className="relative">
+                <select
+                  value={selectedBrand}
+                  onChange={(event) => setSelectedBrand(event.target.value)}
+                  className="h-13 w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 pr-10 text-sm font-semibold text-slate-700 outline-none"
+                >
+                  <option value="all">Tüm Markalar</option>
+                  {brandOptions
+                    .filter((item) => item !== 'all')
+                    .map((brand) => (
+                      <option key={brand} value={brand}>
+                        {brand}
+                      </option>
+                    ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              </div>
+
+              <div className="relative">
+                <select
+                  value={selectedFuel}
+                  onChange={(event) => setSelectedFuel(event.target.value)}
+                  className="h-13 w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 pr-10 text-sm font-semibold text-slate-700 outline-none"
+                >
+                  <option value="all">Tüm Yakıtlar</option>
+                  {fuelOptions
+                    .filter((item) => item !== 'all')
+                    .map((fuel) => (
+                      <option key={fuel} value={fuel}>
+                        {mapFuelType(fuel)}
+                      </option>
+                    ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              </div>
+
+              <div className="relative">
+                <select
+                  value={selectedTransmission}
+                  onChange={(event) => setSelectedTransmission(event.target.value)}
+                  className="h-13 w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 pr-10 text-sm font-semibold text-slate-700 outline-none"
+                >
+                  <option value="all">Tüm Vitesler</option>
+                  {transmissionOptions
+                    .filter((item) => item !== 'all')
+                    .map((transmission) => (
+                      <option key={transmission} value={transmission}>
+                        {mapTransmission(transmission)}
+                      </option>
+                    ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              </div>
+
+              <div className="relative">
+                <select
+                  value={selectedCity}
+                  onChange={(event) => setSelectedCity(event.target.value)}
+                  className="h-13 w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 pr-10 text-sm font-semibold text-slate-700 outline-none"
+                >
+                  <option value="all">Tüm Şehirler</option>
+                  {cityOptions
+                    .filter((item) => item !== 'all')
+                    .map((city) => (
+                      <option key={city} value={city}>
+                        {city}
+                      </option>
+                    ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              </div>
+
+              <div className="flex gap-3">
+                <div className="relative flex-1">
+                  <select
+                    value={sortBy}
+                    onChange={(event) => setSortBy(event.target.value as SortOption)}
+                    className="h-13 w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 pr-10 text-sm font-semibold text-slate-700 outline-none"
+                  >
+                    <option value="newest">En Yeni</option>
+                    <option value="oldest">En Eski</option>
+                    <option value="price-desc">Fiyat Azalan</option>
+                    <option value="price-asc">Fiyat Artan</option>
+                    <option value="km-asc">KM Azalan</option>
+                    <option value="year-desc">Model Yılı</option>
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="inline-flex items-center justify-center rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                >
+                  Sıfırla
+                </button>
+              </div>
+            </div>
+
+            {mobileFiltersOpen && (
+              <div className="mt-4 grid gap-4 border-t border-slate-100 pt-4 md:hidden">
+                <div className="grid gap-3">
+                  {[
+                    { key: 'all', label: 'Tümü' },
+                    { key: 'featured', label: 'Öne Çıkanlar' },
+                    { key: 'newest', label: 'Yeni İlanlar' },
+                    { key: 'low-km', label: 'Düşük KM' },
+                    { key: 'warranty', label: 'Garantili' },
+                    { key: 'exchange', label: 'Takaslı' },
+                  ].map((tab) => {
+                    const isActive = activeQuickTab === tab.key;
+
+                    return (
+                      <button
+                        key={tab.key}
+                        type="button"
+                        onClick={() => setActiveQuickTab(tab.key as QuickTab)}
+                        className={`rounded-2xl px-4 py-3 text-left text-sm font-semibold transition ${
+                          isActive
+                            ? 'bg-slate-900 text-white'
+                            : 'bg-slate-100 text-slate-700'
+                        }`}
+                      >
+                        {tab.label}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="grid gap-3">
+                  <div className="relative">
+                    <select
+                      value={selectedBrand}
+                      onChange={(event) => setSelectedBrand(event.target.value)}
+                      className="h-12 w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 pr-10 text-sm font-semibold text-slate-700"
+                    >
+                      <option value="all">Tüm Markalar</option>
+                      {brandOptions
+                        .filter((item) => item !== 'all')
+                        .map((brand) => (
+                          <option key={brand} value={brand}>
+                            {brand}
+                          </option>
+                        ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  </div>
+
+                  <div className="relative">
+                    <select
+                      value={selectedFuel}
+                      onChange={(event) => setSelectedFuel(event.target.value)}
+                      className="h-12 w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 pr-10 text-sm font-semibold text-slate-700"
+                    >
+                      <option value="all">Tüm Yakıtlar</option>
+                      {fuelOptions
+                        .filter((item) => item !== 'all')
+                        .map((fuel) => (
+                          <option key={fuel} value={fuel}>
+                            {mapFuelType(fuel)}
+                          </option>
+                        ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  </div>
+
+                  <div className="relative">
+                    <select
+                      value={selectedTransmission}
+                      onChange={(event) => setSelectedTransmission(event.target.value)}
+                      className="h-12 w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 pr-10 text-sm font-semibold text-slate-700"
+                    >
+                      <option value="all">Tüm Vitesler</option>
+                      {transmissionOptions
+                        .filter((item) => item !== 'all')
+                        .map((transmission) => (
+                          <option key={transmission} value={transmission}>
+                            {mapTransmission(transmission)}
+                          </option>
+                        ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  </div>
+
+                  <div className="relative">
+                    <select
+                      value={selectedCity}
+                      onChange={(event) => setSelectedCity(event.target.value)}
+                      className="h-12 w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 pr-10 text-sm font-semibold text-slate-700"
+                    >
+                      <option value="all">Tüm Şehirler</option>
+                      {cityOptions
+                        .filter((item) => item !== 'all')
+                        .map((city) => (
+                          <option key={city} value={city}>
+                            {city}
+                          </option>
+                        ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={resetFilters}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700"
+                >
+                  <X className="h-4 w-4" />
+                  Filtreleri sıfırla
+                </button>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
+          <div className="mb-6 flex flex-col gap-4 rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-slate-500">Sonuçlar</p>
+              <h2 className="mt-1 text-2xl font-black text-slate-900">
+                {filteredVehicles.length} araç bulundu
+              </h2>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700">
+                <SlidersHorizontal className="h-4 w-4" />
+                {activeFilterCount} aktif filtre
+              </div>
+
+              {activeQuickTab !== 'all' && (
+                <span className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700">
+                  Hızlı Sekme: {activeQuickTab}
+                </span>
               )}
             </div>
+          </div>
 
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {vehicles.map((vehicle) => (
-                <VehicleCard
-                  key={vehicle.id}
-                  vehicle={vehicle}
-                  onClick={() => onNavigate('vehicle-detail', vehicle.id)}
-                />
+          {loading ? (
+            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div
+                  key={index}
+                  className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm"
+                >
+                  <div className="h-56 animate-pulse bg-slate-200" />
+                  <div className="space-y-4 p-5">
+                    <div className="h-4 w-28 animate-pulse rounded bg-slate-200" />
+                    <div className="h-6 w-4/5 animate-pulse rounded bg-slate-200" />
+                    <div className="h-4 w-2/3 animate-pulse rounded bg-slate-200" />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="h-16 animate-pulse rounded-2xl bg-slate-200" />
+                      <div className="h-16 animate-pulse rounded-2xl bg-slate-200" />
+                    </div>
+                    <div className="h-12 animate-pulse rounded bg-slate-200" />
+                  </div>
+                </div>
               ))}
             </div>
-          </>
-        ) : (
-          <div className="py-12 text-center">
-            <div className="mb-4 text-gray-400">
-              <Search className="mx-auto h-16 w-16" />
+          ) : filteredVehicles.length > 0 ? (
+            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+              {filteredVehicles.map((vehicle) => renderVehicleCard(vehicle))}
             </div>
-            <h3 className="mb-2 text-xl font-semibold text-gray-900">
-              {language === 'tr' ? 'Araç ilanı bulunamadı' : 'No vehicle listings found'}
-            </h3>
-            <p className="text-gray-600">
-              {language === 'tr' ? 'Filtreleri değiştirerek tekrar deneyin' : 'Try adjusting your filters'}
-            </p>
-          </div>
-        )}
+          ) : (
+            <div className="rounded-[32px] border border-dashed border-slate-300 bg-white p-10 text-center shadow-sm sm:p-16">
+              <div className="mx-auto inline-flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 text-slate-600">
+                <Search className="h-7 w-7" />
+              </div>
+              <h3 className="mt-6 text-2xl font-black text-slate-900">Sonuç bulunamadı</h3>
+              <p className="mx-auto mt-3 max-w-xl text-base leading-7 text-slate-600">
+                Seçtiğiniz filtrelere uygun araç ilanı bulunamadı. Filtreleri sıfırlayıp tekrar
+                deneyin.
+              </p>
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="mt-8 inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Filtreleri temizle
+              </button>
+            </div>
+          )}
+        </section>
       </div>
-    </div>
+    </>
   );
 }

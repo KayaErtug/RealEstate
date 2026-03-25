@@ -1,6 +1,14 @@
 // src/pages/GuidePage.tsx
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, BookOpen, Calendar, Search } from 'lucide-react';
+import {
+  ArrowRight,
+  BookOpen,
+  Calendar,
+  Search,
+  BadgeCheck,
+  TrendingUp,
+  Building2,
+} from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 import { supabase } from '../lib/supabase';
 import { useLanguage } from '../contexts/LanguageContext';
@@ -29,7 +37,7 @@ export default function GuidePage({ onNavigate }: GuidePageProps) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadPosts();
+    void loadPosts();
   }, []);
 
   useEffect(() => {
@@ -45,11 +53,7 @@ export default function GuidePage({ onNavigate }: GuidePageProps) {
       const description = post.seo_description?.toLowerCase() || '';
       const content = post.content?.toLowerCase() || '';
 
-      return (
-        title.includes(query) ||
-        description.includes(query) ||
-        content.includes(query)
-      );
+      return title.includes(query) || description.includes(query) || content.includes(query);
     });
 
     setFilteredPosts(nextPosts);
@@ -196,6 +200,36 @@ export default function GuidePage({ onNavigate }: GuidePageProps) {
     return plainText.length > 180 ? `${plainText.slice(0, 180)}...` : plainText;
   };
 
+  const featuredPost = filteredPosts.length > 0 ? filteredPosts[0] : null;
+  const secondaryPosts = filteredPosts.slice(1);
+
+  const guideHighlights = [
+    {
+      title: language === 'tr' ? 'Piyasa Okumaları' : 'Market Insights',
+      description:
+        language === 'tr'
+          ? 'Bölgesel değer, yatırım mantığı ve portföy bakış açısını destekleyen içerikler.'
+          : 'Content supporting regional value, investment logic and portfolio perspective.',
+      icon: TrendingUp,
+    },
+    {
+      title: language === 'tr' ? 'Konut & Arsa Rehberi' : 'Housing & Land Guides',
+      description:
+        language === 'tr'
+          ? 'Konut, arsa ve farklı portföy tipleri için yön gösterici bilgiler.'
+          : 'Guiding information for housing, land and different portfolio types.',
+      icon: Building2,
+    },
+    {
+      title: language === 'tr' ? 'Kurumsal İçerik Gücü' : 'Professional Content Strength',
+      description:
+        language === 'tr'
+          ? 'Varol Gayrimenkul yaklaşımını destekleyen güven verici içerik yapısı.'
+          : 'A trust-building content structure supporting the Varol Gayrimenkul approach.',
+      icon: BadgeCheck,
+    },
+  ];
+
   return (
     <>
       <Helmet>
@@ -223,16 +257,14 @@ export default function GuidePage({ onNavigate }: GuidePageProps) {
       <div className="min-h-screen bg-gray-50 pt-20">
         <section className="border-b border-gray-100 bg-white">
           <div className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
-            <div className="mx-auto max-w-3xl text-center">
+            <div className="mx-auto max-w-4xl text-center">
               <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700">
                 <BookOpen className="h-4 w-4" />
                 {language === 'tr' ? 'Gayrimenkul Rehberi' : 'Real Estate Guide'}
               </div>
 
               <h1 className="text-4xl font-bold tracking-tight text-gray-900 md:text-5xl">
-                {language === 'tr'
-                  ? 'Gayrimenkul Rehberi'
-                  : 'Real Estate Guide'}
+                {language === 'tr' ? 'Gayrimenkul Rehberi' : 'Real Estate Guide'}
               </h1>
 
               <p className="mt-4 text-lg text-gray-600">
@@ -247,11 +279,7 @@ export default function GuidePage({ onNavigate }: GuidePageProps) {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={
-                    language === 'tr'
-                      ? 'Rehber içinde ara...'
-                      : 'Search in the guide...'
-                  }
+                  placeholder={language === 'tr' ? 'Rehber içinde ara...' : 'Search in the guide...'}
                   className="w-full rounded-2xl border border-gray-300 bg-white py-4 pl-12 pr-4 text-gray-800 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
                 />
               </div>
@@ -259,18 +287,43 @@ export default function GuidePage({ onNavigate }: GuidePageProps) {
           </div>
         </section>
 
+        <section className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
+          <div className="grid gap-4 md:grid-cols-3">
+            {guideHighlights.map((item) => {
+              const Icon = item.icon;
+
+              return (
+                <div
+                  key={item.title}
+                  className="rounded-3xl border border-gray-100 bg-white p-5 shadow-sm"
+                >
+                  <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
+                    <Icon className="h-5 w-5" />
+                  </div>
+
+                  <h2 className="text-lg font-bold text-gray-900">{item.title}</h2>
+                  <p className="mt-2 text-sm leading-6 text-gray-600">{item.description}</p>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
         <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
           {loading ? (
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-              {[1, 2, 3, 4, 5, 6].map((item) => (
-                <div key={item} className="h-[420px] animate-pulse rounded-3xl bg-gray-200" />
-              ))}
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+              <div className="h-[420px] animate-pulse rounded-3xl bg-gray-200" />
+              <div className="space-y-4">
+                {[1, 2].map((item) => (
+                  <div key={item} className="h-[200px] animate-pulse rounded-3xl bg-gray-200" />
+                ))}
+              </div>
             </div>
-          ) : filteredPosts.length > 0 ? (
+          ) : filteredPosts.length > 0 && featuredPost ? (
             <>
               <div className="mb-6 flex items-center justify-between">
                 <h2 className="text-2xl font-bold text-gray-900">
-                  {language === 'tr' ? 'Tüm Rehber Yazıları' : 'All Guide Articles'}
+                  {language === 'tr' ? 'Öne Çıkan İçerikler' : 'Featured Content'}
                 </h2>
                 <div className="text-sm text-gray-500">
                   {language === 'tr'
@@ -279,64 +332,167 @@ export default function GuidePage({ onNavigate }: GuidePageProps) {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {filteredPosts.map((post) => {
-                  const coverImage =
-                    post.cover_image && post.cover_image.trim()
-                      ? post.cover_image
-                      : 'https://images.pexels.com/photos/323780/pexels-photo-323780.jpeg?auto=compress&cs=tinysrgb&w=1200';
+              <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+                <article
+                  onClick={() => onNavigate('guide-detail', featuredPost.slug)}
+                  className="group cursor-pointer overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+                >
+                  <div className="relative h-64 overflow-hidden bg-gray-100 sm:h-80">
+                    <img
+                      src={
+                        featuredPost.cover_image && featuredPost.cover_image.trim()
+                          ? featuredPost.cover_image
+                          : 'https://images.pexels.com/photos/323780/pexels-photo-323780.jpeg?auto=compress&cs=tinysrgb&w=1200'
+                      }
+                      alt={`${featuredPost.title} - ${language === 'tr' ? 'Gayrimenkul Rehberi' : 'Real Estate Guide'}`}
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      loading="lazy"
+                      decoding="async"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
 
-                  return (
+                    <div className="absolute bottom-4 left-4 inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1.5 text-xs font-medium text-gray-800 backdrop-blur-sm">
+                      <Calendar className="h-3.5 w-3.5" />
+                      {formatDate(featuredPost.created_at)}
+                    </div>
+                  </div>
+
+                  <div className="p-6 sm:p-7">
+                    <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                      <BookOpen className="h-3.5 w-3.5" />
+                      {language === 'tr' ? 'Öne Çıkan Yazı' : 'Featured Article'}
+                    </div>
+
+                    <h3 className="mt-4 text-2xl font-bold leading-8 text-gray-900">
+                      {featuredPost.title}
+                    </h3>
+
+                    <p className="mt-4 text-sm leading-7 text-gray-600">
+                      {getExcerpt(featuredPost)}
+                    </p>
+
+                    <div className="mt-5 flex items-center gap-2 text-sm font-semibold text-emerald-700">
+                      <span>{language === 'tr' ? 'Yazıyı Oku' : 'Read Article'}</span>
+                      <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                    </div>
+                  </div>
+                </article>
+
+                <div className="space-y-4">
+                  {secondaryPosts.slice(0, 3).map((post) => (
                     <article
                       key={post.id}
                       onClick={() => onNavigate('guide-detail', post.slug)}
-                      className="group cursor-pointer overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+                      className="group cursor-pointer overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
                     >
-                      <div className="relative h-60 overflow-hidden bg-gray-100">
-                        <img
-                          src={coverImage}
-                          alt={`${post.title} - ${language === 'tr' ? 'Gayrimenkul Rehberi' : 'Real Estate Guide'}`}
-                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                          loading="lazy"
-                          decoding="async"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
-
-                        <div className="absolute bottom-4 left-4 inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1.5 text-xs font-medium text-gray-800 backdrop-blur-sm">
-                          <Calendar className="h-3.5 w-3.5" />
-                          {formatDate(post.created_at)}
+                      <div className="flex min-h-[170px]">
+                        <div className="w-[38%] shrink-0 overflow-hidden bg-gray-100">
+                          <img
+                            src={
+                              post.cover_image && post.cover_image.trim()
+                                ? post.cover_image
+                                : 'https://images.pexels.com/photos/323780/pexels-photo-323780.jpeg?auto=compress&cs=tinysrgb&w=1200'
+                            }
+                            alt={post.title}
+                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            loading="lazy"
+                            decoding="async"
+                          />
                         </div>
-                      </div>
 
-                      <div className="p-6">
-                        <h3 className="line-clamp-2 text-xl font-bold leading-7 text-gray-900">
-                          {post.title}
-                        </h3>
+                        <div className="flex min-w-0 flex-1 flex-col justify-between p-4">
+                          <div>
+                            <div className="flex items-center gap-2 text-xs text-emerald-700">
+                              <Calendar className="h-3.5 w-3.5" />
+                              {formatDate(post.created_at)}
+                            </div>
 
-                        <p className="mt-3 line-clamp-4 text-sm leading-6 text-gray-600">
-                          {getExcerpt(post)}
-                        </p>
+                            <h3 className="mt-2 line-clamp-2 text-lg font-bold leading-6 text-gray-900">
+                              {post.title}
+                            </h3>
 
-                        <div className="mt-5 flex items-center justify-between border-t border-gray-100 pt-4">
-                          <span className="text-sm font-medium text-emerald-700">
-                            {language === 'tr' ? 'Yazıyı Oku' : 'Read Article'}
-                          </span>
+                            <p className="mt-2 line-clamp-3 text-sm leading-6 text-gray-600">
+                              {getExcerpt(post)}
+                            </p>
+                          </div>
 
-                          <ArrowRight className="h-4 w-4 text-emerald-700 transition-transform duration-300 group-hover:translate-x-1" />
+                          <div className="mt-3 flex items-center gap-2 text-sm font-semibold text-emerald-700">
+                            <span>{language === 'tr' ? 'Oku' : 'Read'}</span>
+                            <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                          </div>
                         </div>
                       </div>
                     </article>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
+
+              {filteredPosts.length > 1 && (
+                <div className="mt-12">
+                  <div className="mb-6 flex items-center justify-between">
+                    <h2 className="text-2xl font-bold text-gray-900">
+                      {language === 'tr' ? 'Tüm Rehber Yazıları' : 'All Guide Articles'}
+                    </h2>
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+                    {filteredPosts.map((post) => {
+                      const coverImage =
+                        post.cover_image && post.cover_image.trim()
+                          ? post.cover_image
+                          : 'https://images.pexels.com/photos/323780/pexels-photo-323780.jpeg?auto=compress&cs=tinysrgb&w=1200';
+
+                      return (
+                        <article
+                          key={post.id}
+                          onClick={() => onNavigate('guide-detail', post.slug)}
+                          className="group cursor-pointer overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+                        >
+                          <div className="relative h-56 overflow-hidden bg-gray-100">
+                            <img
+                              src={coverImage}
+                              alt={`${post.title} - ${language === 'tr' ? 'Gayrimenkul Rehberi' : 'Real Estate Guide'}`}
+                              className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                              loading="lazy"
+                              decoding="async"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/10 to-transparent" />
+
+                            <div className="absolute bottom-4 left-4 inline-flex items-center gap-2 rounded-full bg-white/90 px-3 py-1.5 text-xs font-medium text-gray-800 backdrop-blur-sm">
+                              <Calendar className="h-3.5 w-3.5" />
+                              {formatDate(post.created_at)}
+                            </div>
+                          </div>
+
+                          <div className="p-6">
+                            <h3 className="line-clamp-2 text-xl font-bold leading-7 text-gray-900">
+                              {post.title}
+                            </h3>
+
+                            <p className="mt-3 line-clamp-4 text-sm leading-6 text-gray-600">
+                              {getExcerpt(post)}
+                            </p>
+
+                            <div className="mt-5 flex items-center justify-between border-t border-gray-100 pt-4">
+                              <span className="text-sm font-medium text-emerald-700">
+                                {language === 'tr' ? 'Yazıyı Oku' : 'Read Article'}
+                              </span>
+
+                              <ArrowRight className="h-4 w-4 text-emerald-700 transition-transform duration-300 group-hover:translate-x-1" />
+                            </div>
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <div className="rounded-3xl border border-gray-100 bg-white px-6 py-20 text-center shadow-sm">
               <BookOpen className="mx-auto h-14 w-14 text-gray-300" />
               <h2 className="mt-4 text-2xl font-bold text-gray-900">
-                {language === 'tr'
-                  ? 'Henüz rehber yazısı bulunamadı'
-                  : 'No guide articles found yet'}
+                {language === 'tr' ? 'Henüz rehber yazısı bulunamadı' : 'No guide articles found yet'}
               </h2>
               <p className="mt-3 text-gray-600">
                 {searchQuery.trim()

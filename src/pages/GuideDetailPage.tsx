@@ -1,6 +1,6 @@
 // src/pages/GuideDetailPage.tsx
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Calendar, BookOpen, Share2, Copy } from 'lucide-react';
+import { ArrowLeft, Calendar, BookOpen, Share2, Copy, ArrowRight, BadgeCheck } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 import { supabase } from '../lib/supabase';
 import type { Property } from '../lib/database.types';
@@ -34,13 +34,13 @@ export default function GuideDetailPage({ slug, onNavigate }: GuideDetailPagePro
   const [relatedPropertiesLoading, setRelatedPropertiesLoading] = useState(true);
 
   useEffect(() => {
-    loadPost();
+    void loadPost();
   }, [slug]);
 
   useEffect(() => {
     if (post) {
-      loadRecentPosts(post.slug);
-      loadRelatedProperties(post);
+      void loadRecentPosts(post.slug);
+      void loadRelatedProperties(post);
     }
   }, [post]);
 
@@ -285,9 +285,7 @@ export default function GuideDetailPage({ slug, onNavigate }: GuideDetailPagePro
     const plainText = post.content?.replace(/\s+/g, ' ').trim() || '';
 
     if (!plainText) {
-      return language === 'tr'
-        ? 'Gayrimenkul rehberi yazısı.'
-        : 'Real estate guide article.';
+      return language === 'tr' ? 'Gayrimenkul rehberi yazısı.' : 'Real estate guide article.';
     }
 
     return plainText.length > 160 ? `${plainText.slice(0, 160)}...` : plainText;
@@ -360,9 +358,10 @@ export default function GuideDetailPage({ slug, onNavigate }: GuideDetailPagePro
       inLanguage: language === 'tr' ? 'tr-TR' : 'en-US',
       url: canonicalUrl,
       articleSection: language === 'tr' ? 'Gayrimenkul Rehberi' : 'Real Estate Guide',
-      keywords: language === 'tr'
-        ? ['gayrimenkul', 'rehber', 'denizli', 'yatırım', 'arsa', 'konut']
-        : ['real estate', 'guide', 'denizli', 'investment', 'land', 'housing'],
+      keywords:
+        language === 'tr'
+          ? ['gayrimenkul', 'rehber', 'denizli', 'yatırım', 'arsa', 'konut']
+          : ['real estate', 'guide', 'denizli', 'investment', 'land', 'housing'],
     });
   }, [post, seoDescription, pageImage, canonicalUrl, language]);
 
@@ -417,6 +416,23 @@ export default function GuideDetailPage({ slug, onNavigate }: GuideDetailPagePro
       </p>
     ));
   };
+
+  const articleQuickItems = post
+    ? [
+        {
+          label: language === 'tr' ? 'Kategori' : 'Category',
+          value: language === 'tr' ? 'Gayrimenkul Rehberi' : 'Real Estate Guide',
+        },
+        {
+          label: language === 'tr' ? 'Yayın Tarihi' : 'Publish Date',
+          value: formatDate(post.created_at),
+        },
+        {
+          label: language === 'tr' ? 'Yazar' : 'Author',
+          value: 'Varol Gayrimenkul',
+        },
+      ]
+    : [];
 
   if (loading) {
     return (
@@ -503,15 +519,9 @@ export default function GuideDetailPage({ slug, onNavigate }: GuideDetailPagePro
         <meta name="twitter:description" content={seoDescription} />
         <meta name="twitter:image" content={pageImage} />
         <link rel="canonical" href={canonicalUrl} />
-        {blogPostingSchemaJson ? (
-          <script type="application/ld+json">{blogPostingSchemaJson}</script>
-        ) : null}
-        {articleSchemaJson ? (
-          <script type="application/ld+json">{articleSchemaJson}</script>
-        ) : null}
-        {breadcrumbSchemaJson ? (
-          <script type="application/ld+json">{breadcrumbSchemaJson}</script>
-        ) : null}
+        {blogPostingSchemaJson ? <script type="application/ld+json">{blogPostingSchemaJson}</script> : null}
+        {articleSchemaJson ? <script type="application/ld+json">{articleSchemaJson}</script> : null}
+        {breadcrumbSchemaJson ? <script type="application/ld+json">{breadcrumbSchemaJson}</script> : null}
         {itemListRelatedPropertiesSchemaJson ? (
           <script type="application/ld+json">{itemListRelatedPropertiesSchemaJson}</script>
         ) : null}
@@ -527,10 +537,10 @@ export default function GuideDetailPage({ slug, onNavigate }: GuideDetailPagePro
             {language === 'tr' ? 'Gayrimenkul Rehberine Dön' : 'Back to Real Estate Guide'}
           </button>
 
-          <div className="grid grid-cols-1 gap-10 lg:grid-cols-12">
+          <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
             <article className="lg:col-span-8">
               <div className="overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm">
-                <div className="relative h-[260px] bg-gray-100 sm:h-[360px]">
+                <div className="relative h-[260px] bg-gray-100 sm:h-[380px]">
                   <img
                     src={pageImage}
                     alt={`${post.title} - ${language === 'tr' ? 'Gayrimenkul Rehberi' : 'Real Estate Guide'}`}
@@ -556,9 +566,7 @@ export default function GuideDetailPage({ slug, onNavigate }: GuideDetailPagePro
                     {post.title}
                   </h1>
 
-                  <p className="mt-4 text-lg leading-8 text-gray-600">
-                    {seoDescription}
-                  </p>
+                  <p className="mt-4 text-lg leading-8 text-gray-600">{seoDescription}</p>
 
                   <div className="mt-6 flex flex-wrap gap-3">
                     <button
@@ -578,12 +586,33 @@ export default function GuideDetailPage({ slug, onNavigate }: GuideDetailPagePro
                       <Copy className="h-4 w-4" />
                       {language === 'tr' ? 'Linki Kopyala' : 'Copy Link'}
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={() => onNavigate('properties')}
+                      className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      <ArrowRight className="h-4 w-4" />
+                      {language === 'tr' ? 'İlanlara Geç' : 'Go to Listings'}
+                    </button>
+                  </div>
+
+                  <div className="mt-8 rounded-2xl border border-emerald-100 bg-emerald-50 px-5 py-4">
+                    <div className="flex items-center gap-2">
+                      <BadgeCheck className="h-4 w-4 text-emerald-700" />
+                      <span className="text-sm font-semibold text-emerald-800">
+                        {language === 'tr' ? 'Kurumsal Not' : 'Professional Note'}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm leading-7 text-emerald-900">
+                      {language === 'tr'
+                        ? 'Bu içerik, Varol Gayrimenkul yaklaşımını destekleyen bilgilendirici bir rehber niteliğindedir.'
+                        : 'This content is an informative guide supporting the Varol Gayrimenkul approach.'}
+                    </p>
                   </div>
 
                   <div className="mt-8 border-t border-gray-100 pt-8">
-                    <div className="space-y-6">
-                      {renderContentParagraphs(post.content)}
-                    </div>
+                    <div className="space-y-6">{renderContentParagraphs(post.content)}</div>
                   </div>
                 </div>
               </div>
@@ -628,27 +657,36 @@ export default function GuideDetailPage({ slug, onNavigate }: GuideDetailPagePro
                     {language === 'tr' ? 'Yazı Bilgileri' : 'Article Details'}
                   </h2>
 
-                  <div className="mt-4 space-y-4 text-sm text-gray-700">
-                    <div className="flex items-start justify-between gap-3 border-b border-gray-100 pb-3">
-                      <span className="font-medium text-gray-500">
-                        {language === 'tr' ? 'Kategori' : 'Category'}
-                      </span>
-                      <span>{language === 'tr' ? 'Gayrimenkul Rehberi' : 'Real Estate Guide'}</span>
-                    </div>
+                  <div className="mt-4 space-y-3">
+                    {articleQuickItems.map((item) => (
+                      <div
+                        key={item.label}
+                        className="flex items-start justify-between gap-3 rounded-2xl bg-gray-50 px-4 py-3 text-sm"
+                      >
+                        <span className="font-medium text-gray-500">{item.label}</span>
+                        <span className="text-right font-medium text-gray-900">{item.value}</span>
+                      </div>
+                    ))}
+                  </div>
 
-                    <div className="flex items-start justify-between gap-3 border-b border-gray-100 pb-3">
-                      <span className="font-medium text-gray-500">
-                        {language === 'tr' ? 'Yayın Tarihi' : 'Publish Date'}
-                      </span>
-                      <span>{formatDate(post.created_at)}</span>
-                    </div>
+                  <div className="mt-5 space-y-3">
+                    <button
+                      type="button"
+                      onClick={shareOnWhatsApp}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white transition hover:bg-emerald-700"
+                    >
+                      <Share2 className="h-4 w-4" />
+                      {language === 'tr' ? 'WhatsApp’ta Paylaş' : 'Share on WhatsApp'}
+                    </button>
 
-                    <div className="flex items-start justify-between gap-3">
-                      <span className="font-medium text-gray-500">
-                        {language === 'tr' ? 'Yazar' : 'Author'}
-                      </span>
-                      <span>Varol Gayrimenkul</span>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onNavigate('properties')}
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 font-medium text-gray-700 transition hover:bg-gray-100"
+                    >
+                      <ArrowRight className="h-4 w-4" />
+                      {language === 'tr' ? 'İlanlara Geç' : 'Go to Listings'}
+                    </button>
                   </div>
                 </div>
 
@@ -672,9 +710,7 @@ export default function GuideDetailPage({ slug, onNavigate }: GuideDetailPagePro
                           onClick={() => onNavigate('guide-detail', item.slug)}
                           className="w-full rounded-2xl border border-gray-100 p-4 text-left transition-colors hover:bg-gray-50"
                         >
-                          <div className="text-sm text-emerald-700">
-                            {formatDate(item.created_at)}
-                          </div>
+                          <div className="text-sm text-emerald-700">{formatDate(item.created_at)}</div>
                           <div className="mt-1 line-clamp-2 font-semibold text-gray-900">
                             {item.title}
                           </div>

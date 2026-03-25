@@ -15,17 +15,14 @@ import {
   Car,
   ChevronRight as CategoryChevronRight,
   Info,
-  ShieldCheck,
-  BadgeCheck,
   MapPin,
-  Sparkles,
+  PlayCircle,
 } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import { supabase } from "../lib/supabase";
 import type { Property } from "../lib/database.types";
 import PropertyCard from "../components/PropertyCard";
 import { useLanguage } from "../contexts/LanguageContext";
-import HomeVehiclesShowcase from "../components/home/HomeVehiclesShowcase";
 import {
   getPropertyTypeLabel,
   getStatusLabel,
@@ -61,7 +58,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
   const [loading, setLoading] = useState(true);
   const [popularLoading, setPopularLoading] = useState(true);
   const [recentLoading, setRecentLoading] = useState(true);
-  const [guideLoading, setGuideLoading] = useState(true);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [searchType, setSearchType] = useState<"all" | "for_sale" | "for_rent">("all");
@@ -241,8 +237,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
   const loadGuidePosts = async () => {
     try {
-      setGuideLoading(true);
-
       const { data, error } = await supabase
         .from("blog_posts")
         .select("id,title,slug,cover_image,seo_description,created_at")
@@ -256,8 +250,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     } catch (error) {
       console.error("Guide posts load error:", error);
       setGuidePosts([]);
-    } finally {
-      setGuideLoading(false);
     }
   };
 
@@ -295,22 +287,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
     onNavigate(page);
   };
-
-  const featuredCards = useMemo(
-    () =>
-      featuredProperties.map((property) => (
-        <PropertyCard
-          key={property.id}
-          property={property}
-          onClick={() => onNavigate("property-detail", property.id)}
-          isFavorite={favoriteIds.includes(property.id)}
-          onToggleFavorite={toggleFavorite}
-          onShareWhatsApp={shareOnWhatsApp}
-          onCopyLink={copyPropertyLink}
-        />
-      )),
-    [featuredProperties, favoriteIds, onNavigate]
-  );
 
   const popularCards = useMemo(
     () =>
@@ -402,50 +378,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
 
     return items.slice(0, 6);
   }, [sliderProperty, language]);
-
-  const heroStats = useMemo(() => {
-    const featuredCount = featuredProperties.length;
-    const popularCount = popularProperties.length;
-    const guideCount = guidePosts.length;
-
-    return [
-      {
-        id: "featured",
-        icon: BadgeCheck,
-        title: language === "tr" ? "Seçili Portföy" : "Selected Portfolio",
-        value:
-          featuredCount > 0
-            ? `${featuredCount}+`
-            : language === "tr"
-            ? "Güncel"
-            : "Updated",
-      },
-      {
-        id: "popular",
-        icon: ShieldCheck,
-        title: language === "tr" ? "Güven Veren Vitrin" : "Trusted Showcase",
-        value:
-          popularCount > 0
-            ? language === "tr"
-              ? "Popüler İlanlar"
-              : "Popular Listings"
-            : language === "tr"
-            ? "Aktif"
-            : "Active",
-      },
-      {
-        id: "guide",
-        icon: Sparkles,
-        title: language === "tr" ? "Rehber İçerikler" : "Guide Content",
-        value:
-          guideCount > 0
-            ? `${guideCount}+`
-            : language === "tr"
-            ? "Yeni"
-            : "Fresh",
-      },
-    ];
-  }, [featuredProperties.length, popularProperties.length, guidePosts.length, language]);
 
   const trustItems = useMemo(() => {
     return [
@@ -823,16 +755,6 @@ export default function HomePage({ onNavigate }: HomePageProps) {
     });
   }, [language]);
 
-  const formatGuideDate = (dateString: string) => {
-    const locale = language === "tr" ? "tr-TR" : "en-US";
-
-    return new Intl.DateTimeFormat(locale, {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    }).format(new Date(dateString));
-  };
-
   const categories = [
     {
       id: "for-sale",
@@ -960,10 +882,10 @@ export default function HomePage({ onNavigate }: HomePageProps) {
         <section className="relative overflow-hidden border-b border-gray-200 bg-white">
           <div className="absolute inset-0 bg-gradient-to-br from-brand/5 via-white to-emerald-50" />
 
-          <div className="relative mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
-            <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-stretch">
+          <div className="relative mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
+            <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-stretch">
               <div className="flex flex-col items-center justify-center text-center">
-                <div className="mb-4 inline-flex w-fit items-center rounded-full bg-brand/10 px-4 py-1.5 text-sm font-semibold text-brand">
+                <div className="mb-3 inline-flex w-fit items-center rounded-full bg-brand/10 px-4 py-1.5 text-sm font-semibold text-brand">
                   {language === "tr"
                     ? "Denizli ve çevresinde güncel portföy"
                     : "Updated portfolio in Denizli and nearby"}
@@ -975,32 +897,13 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                     : "Access property and vehicle listings quickly and confidently"}
                 </h1>
 
-                <p className="mt-4 max-w-2xl text-center text-base leading-7 text-gray-600 sm:text-lg">
+                <p className="mt-3 max-w-2xl text-center text-base leading-7 text-gray-600 sm:text-lg">
                   {language === "tr"
                     ? "Satılık, kiralık, araç ilanları, projeler ve iletişim kanallarına tek sayfadan hızlı erişin. Denizli odaklı profesyonel vitrin yapısıyla fırsatları kolayca keşfedin."
                     : "Get fast access to sale listings, rentals, vehicle ads, projects and contact channels from one page. Discover opportunities with a professional showcase focused on Denizli."}
                 </p>
 
-                <div className="mt-6 grid w-full max-w-3xl gap-3 sm:grid-cols-3">
-                  {heroStats.map((item) => {
-                    const Icon = item.icon;
-
-                    return (
-                      <div
-                        key={item.id}
-                        className="rounded-2xl border border-gray-200 bg-white px-4 py-4 text-left shadow-sm"
-                      >
-                        <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-emerald-50 text-emerald-700">
-                          <Icon className="h-5 w-5" />
-                        </div>
-                        <div className="text-sm font-medium text-gray-500">{item.title}</div>
-                        <div className="mt-1 text-lg font-bold text-gray-900">{item.value}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <div className="mt-6 w-full max-w-3xl rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
+                <div className="mt-5 w-full max-w-3xl rounded-2xl border border-gray-200 bg-white p-3 shadow-sm">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                     <div className="flex overflow-hidden rounded-xl border border-gray-200">
                       <button
@@ -1062,7 +965,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                   </div>
                 </div>
 
-                <div className="mt-5 flex flex-wrap justify-center gap-3 text-sm text-gray-500">
+                <div className="mt-4 flex flex-wrap justify-center gap-2 text-sm text-gray-500">
                   <span className="rounded-full bg-gray-100 px-3 py-1.5">
                     {language === "tr" ? "Satılık ilanlar" : "For sale listings"}
                   </span>
@@ -1082,8 +985,8 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                   </h2>
                   <p className="mt-1 text-sm text-gray-500">
                     {language === "tr"
-                      ? "Sahibinden benzeri hızlı giriş mantığıyla en çok kullanılan alanlar"
-                      : "Most-used sections with a fast-entry structure"}
+                      ? "En çok kullanılan alanlara hızlı giriş"
+                      : "Quick access to the most-used sections"}
                   </p>
                 </div>
 
@@ -1096,19 +999,19 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                         key={category.id}
                         type="button"
                         onClick={category.onClick}
-                        className="flex w-full items-center gap-4 px-4 py-4 text-left transition hover:bg-gray-50 sm:px-5"
+                        className="flex w-full items-center gap-4 px-4 py-3.5 text-left transition hover:bg-gray-50 sm:px-5"
                       >
                         <div
-                          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${category.iconWrapperClass}`}
+                          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${category.iconWrapperClass}`}
                         >
                           <Icon className="h-5 w-5" />
                         </div>
 
                         <div className="min-w-0 flex-1">
-                          <div className="text-base font-semibold text-gray-900">
+                          <div className="text-sm font-semibold text-gray-900 sm:text-base">
                             {category.title}
                           </div>
-                          <div className="mt-1 line-clamp-1 text-sm text-gray-500">
+                          <div className="mt-0.5 line-clamp-1 text-sm text-gray-500">
                             {category.description}
                           </div>
                         </div>
@@ -1123,20 +1026,22 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </div>
         </section>
 
-        <section className="mx-auto max-w-7xl px-4 pt-8 sm:px-6 lg:px-8">
-          <div className="grid gap-4 md:grid-cols-3">
+        <section className="mx-auto max-w-7xl px-4 pt-6 sm:px-6 lg:px-8">
+          <div className="grid gap-3 md:grid-cols-3">
             {trustItems.map((item) => {
               const Icon = item.icon;
 
               return (
                 <div
                   key={item.id}
-                  className="rounded-2xl border border-gray-200 bg-white px-5 py-5 shadow-sm"
+                  className="rounded-2xl border border-gray-200 bg-white px-4 py-4 shadow-sm"
                 >
-                  <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-700">
+                  <div className="mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-700">
                     <Icon className="h-5 w-5" />
                   </div>
-                  <div className="text-base font-bold text-gray-900">{item.title}</div>
+                  <div className="text-sm font-bold text-gray-900 sm:text-base">
+                    {item.title}
+                  </div>
                   <div className="mt-1 text-sm leading-6 text-gray-600">
                     {item.description}
                   </div>
@@ -1146,18 +1051,18 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           </div>
         </section>
 
-        <section className="mx-auto max-w-7xl px-4 pb-16 pt-10 sm:px-6 lg:px-8">
-          <div className="mb-8 text-center">
+        <section className="mx-auto max-w-7xl px-4 pb-12 pt-8 sm:px-6 lg:px-8">
+          <div className="mb-5 text-center">
             <h2 className="text-2xl font-bold text-gray-900">
               {language === "tr" ? "Öne Çıkan Gayrimenkuller" : "Featured Properties"}
             </h2>
             <p className="mt-1 text-sm text-gray-500">
               {language === "tr"
-                ? "Seçili portföyleri büyük slider alanında keşfet."
-                : "Discover selected listings in the featured slider."}
+                ? "Vitrindeki güçlü ilanları hızlıca inceleyin."
+                : "Quickly review the strongest listings in the showcase."}
             </p>
 
-            <div className="mt-4 flex justify-center">
+            <div className="mt-3 flex justify-center">
               <button
                 onClick={() => onNavigate("properties")}
                 className="flex items-center gap-2 text-green-600"
@@ -1173,7 +1078,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           ) : sliderProperty ? (
             <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-xl">
               <div className="grid grid-cols-1 lg:grid-cols-2">
-                <div className="relative h-[280px] lg:h-[470px]">
+                <div className="relative h-[260px] lg:h-[430px]">
                   <img
                     src={sliderImage}
                     alt={sliderProperty.title}
@@ -1215,18 +1120,18 @@ export default function HomePage({ onNavigate }: HomePageProps) {
                   )}
                 </div>
 
-                <div className="flex flex-col justify-between p-6 lg:p-8">
+                <div className="flex flex-col justify-between p-5 lg:p-7">
                   <div>
                     <div className="mb-3 text-sm font-medium text-emerald-600">
                       {sliderProperty.city}
                       {sliderProperty.district ? ` / ${sliderProperty.district}` : ""}
                     </div>
 
-                    <h3 className="mb-4 text-3xl font-bold leading-tight text-gray-900">
+                    <h3 className="mb-4 text-2xl font-bold leading-tight text-gray-900 lg:text-3xl">
                       {sliderProperty.title}
                     </h3>
 
-                    <p className="mb-4 text-3xl font-bold text-emerald-700">
+                    <p className="mb-4 text-2xl font-bold text-emerald-700 lg:text-3xl">
                       {new Intl.NumberFormat(language === "tr" ? "tr-TR" : "en-US", {
                         style: "currency",
                         currency: sliderProperty.currency,
@@ -1327,46 +1232,50 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           )}
         </section>
 
-        <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
-          <div className="mb-8 flex items-center justify-between">
-            <h2 className="text-2xl font-bold">{t("home.featuredTitle")}</h2>
+        <section className="mx-auto max-w-7xl px-4 pb-8 sm:px-6 lg:px-8">
+          <div className="rounded-2xl border border-amber-200 bg-gradient-to-r from-amber-50 via-white to-amber-50 px-4 py-4 shadow-sm">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-amber-700">
+                  <Car className="h-5 w-5" />
+                </div>
 
-            <button
-              onClick={() => onNavigate("properties")}
-              className="flex items-center gap-2 text-green-600"
-            >
-              {t("home.viewAll")}
-              <ArrowRight size={18} />
-            </button>
+                <div>
+                  <h3 className="text-sm font-bold text-gray-900 sm:text-base">
+                    {language === "tr"
+                      ? "Araç ilanları ayrı sayfada"
+                      : "Vehicle listings on a separate page"}
+                  </h3>
+                  <p className="mt-1 text-sm leading-6 text-gray-600">
+                    {language === "tr"
+                      ? "Ana odak gayrimenkul tarafında. Araç ilanlarına ayrı kategori üzerinden hızlıca geçebilirsin."
+                      : "The main focus is real estate. You can still quickly access vehicle listings through the separate category page."}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex shrink-0">
+                <button
+                  onClick={() => onNavigate("vehicles")}
+                  className="inline-flex items-center gap-2 rounded-xl border border-amber-300 bg-white px-4 py-2.5 font-semibold text-amber-700 transition hover:bg-amber-50"
+                >
+                  {language === "tr" ? "Araç İlanlarına Git" : "Go to Vehicle Listings"}
+                  <ArrowRight size={18} />
+                </button>
+              </div>
+            </div>
           </div>
-
-          {loading ? (
-            <div className="grid gap-6 md:grid-cols-3">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-72 animate-pulse rounded-xl bg-gray-200" />
-              ))}
-            </div>
-          ) : featuredProperties.length > 0 ? (
-            <div className="grid gap-6 md:grid-cols-3">{featuredCards}</div>
-          ) : (
-            <div className="py-20 text-center text-gray-400">
-              <Home size={50} className="mx-auto mb-4" />
-              {t("home.noFeatured")}
-            </div>
-          )}
         </section>
 
-        <HomeVehiclesShowcase onNavigate={onNavigate} />
-
-        <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
-          <div className="mb-8 flex items-center justify-between">
+        <section className="mx-auto max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
+          <div className="mb-6 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100">
                 <TrendingUp className="h-5 w-5 text-emerald-600" />
               </div>
 
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">
+                <h2 className="text-xl font-bold text-gray-900 sm:text-2xl">
                   {language === "tr"
                     ? "En Çok Görüntülenen İlanlar"
                     : "Most Viewed Listings"}
@@ -1397,7 +1306,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           ) : popularProperties.length > 0 ? (
             <div className="grid gap-6 md:grid-cols-3">{popularCards}</div>
           ) : (
-            <div className="py-20 text-center text-gray-400">
+            <div className="py-16 text-center text-gray-400">
               <TrendingUp size={50} className="mx-auto mb-4" />
               {language === "tr"
                 ? "Henüz görüntüleme verisi oluşmadı."
@@ -1406,15 +1315,15 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           )}
         </section>
 
-        <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
-          <div className="mb-8 flex items-center justify-between">
+        <section className="mx-auto max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
+          <div className="mb-6 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100">
                 <History className="h-5 w-5 text-amber-600" />
               </div>
 
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">
+                <h2 className="text-xl font-bold text-gray-900 sm:text-2xl">
                   {language === "tr"
                     ? "Son Gezilen İlanlar"
                     : "Recently Viewed Listings"}
@@ -1445,7 +1354,7 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           ) : recentProperties.length > 0 ? (
             <div className="grid gap-6 md:grid-cols-3">{recentCards}</div>
           ) : (
-            <div className="py-20 text-center text-gray-400">
+            <div className="py-16 text-center text-gray-400">
               <History size={50} className="mx-auto mb-4" />
               {language === "tr"
                 ? "Henüz gezilen ilan geçmişi oluşmadı."
@@ -1454,113 +1363,48 @@ export default function HomePage({ onNavigate }: HomePageProps) {
           )}
         </section>
 
-        <section className="mx-auto max-w-7xl px-4 pb-16 sm:px-6 lg:px-8">
-          <div className="mb-8 text-center">
-            <div className="flex items-center justify-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-100">
-                <BookOpen className="h-5 w-5 text-blue-600" />
+        <section className="mx-auto max-w-7xl px-4 pb-12 sm:px-6 lg:px-8">
+          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+            <div className="flex flex-col gap-4 px-5 py-4 md:flex-row md:items-center md:justify-between">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+                  <PlayCircle className="h-5 w-5" />
+                </div>
+
+                <div>
+                  <h2 className="text-sm font-bold text-gray-900 sm:text-base">
+                    {language === "tr" ? "Tanıtım Videomuz" : "Our Promo Video"}
+                  </h2>
+                  <p className="mt-1 text-sm leading-6 text-gray-600">
+                    {language === "tr"
+                      ? "Varol Gayrimenkul vitrini ve hizmet yaklaşımını kısa tanıtım videosundan izleyin."
+                      : "Watch a short promo video about Varol Real Estate and its service approach."}
+                  </p>
+                </div>
               </div>
 
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900">
-                  {language === "tr"
-                    ? "Son Rehber Yazıları"
-                    : "Latest Guide Articles"}
-                </h2>
-                <p className="text-sm text-gray-500">
-                  {language === "tr"
-                    ? "Gayrimenkul hakkında faydalı içerikleri keşfet."
-                    : "Discover helpful content about real estate."}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-4 flex justify-center">
               <button
-                onClick={() => onNavigate("guide")}
-                className="flex items-center gap-2 text-green-600"
+                type="button"
+                onClick={() => onNavigate("contact")}
+                className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2.5 font-semibold text-gray-700 transition hover:bg-gray-100"
               >
-                {language === "tr" ? "Tümünü Gör" : "View All"}
+                {language === "tr" ? "İletişime Geç" : "Contact Us"}
                 <ArrowRight size={18} />
               </button>
             </div>
-          </div>
 
-          {guideLoading ? (
-            <div className="grid gap-6 md:grid-cols-3">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-72 animate-pulse rounded-xl bg-gray-200" />
-              ))}
+            <div className="border-t border-gray-100 bg-black">
+              <video
+                src="/promo.mp4"
+                controls
+                preload="metadata"
+                className="mx-auto aspect-video max-h-[320px] w-full object-cover"
+              />
             </div>
-          ) : guidePosts.length > 0 ? (
-            <div className="grid gap-6 md:grid-cols-3">
-              {guidePosts.map((post) => (
-                <article
-                  key={post.id}
-                  onClick={() => onNavigate("guide-detail", post.slug)}
-                  className="group cursor-pointer overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
-                >
-                  <div className="relative h-52 overflow-hidden bg-gray-100">
-                    <img
-                      src={post.cover_image || "/logo_varol.png"}
-                      alt={`${post.title} - ${
-                        language === "tr" ? "Gayrimenkul Rehberi" : "Real Estate Guide"
-                      }`}
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      loading="lazy"
-                      decoding="async"
-                    />
-                  </div>
-
-                  <div className="p-5">
-                    <div className="mb-2 text-xs font-medium text-emerald-700">
-                      {formatGuideDate(post.created_at)}
-                    </div>
-
-                    <h3 className="line-clamp-2 text-lg font-bold leading-7 text-gray-900">
-                      {post.title}
-                    </h3>
-
-                    <p className="mt-3 line-clamp-3 text-sm leading-6 text-gray-600">
-                      {post.seo_description && post.seo_description.trim()
-                        ? post.seo_description
-                        : language === "tr"
-                        ? "Gayrimenkul rehber yazısını okumak için tıklayın."
-                        : "Click to read the real estate guide article."}
-                    </p>
-
-                    <div className="mt-5 flex items-center justify-between border-t border-gray-100 pt-4">
-                      <span className="text-sm font-medium text-emerald-700">
-                        {language === "tr" ? "Yazıyı Oku" : "Read Article"}
-                      </span>
-
-                      <ArrowRight className="h-4 w-4 text-emerald-700 transition-transform duration-300 group-hover:translate-x-1" />
-                    </div>
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <div className="py-20 text-center text-gray-400">
-              <BookOpen size={50} className="mx-auto mb-4" />
-              {language === "tr"
-                ? "Henüz rehber yazısı bulunmuyor."
-                : "No guide articles yet."}
-            </div>
-          )}
-        </section>
-
-        <section className="mx-auto max-w-6xl px-4 pb-20 sm:px-6 lg:px-8">
-          <div className="overflow-hidden rounded-xl bg-white shadow-lg">
-            <div className="border-b p-4 text-center font-semibold">
-              {language === "tr" ? "Tanıtım Videomuz" : "Our Promo Video"}
-            </div>
-
-            <video src="/promo.mp4" controls className="w-full" />
           </div>
         </section>
 
-        <section className="bg-green-600 py-20 text-center text-white">
+        <section className="bg-green-600 py-16 text-center text-white">
           <h2 className="mb-4 text-3xl font-bold">{t("home.ctaTitle")}</h2>
           <p className="mb-8 opacity-90">{t("home.ctaSubtitle")}</p>
 

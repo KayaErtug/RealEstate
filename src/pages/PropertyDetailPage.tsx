@@ -12,6 +12,11 @@ import {
   Sparkles,
   TrendingUp,
   Building2,
+  Maximize,
+  Bath,
+  Home,
+  Layers3,
+  BadgePercent,
 } from 'lucide-react';
 import { Map, Marker, InfoWindow, APIProvider } from '@vis.gl/react-google-maps';
 import { Helmet } from 'react-helmet-async';
@@ -37,11 +42,47 @@ interface PropertyDetailPageProps {
 type PropertyWithCoords = Property & {
   latitude?: number | null;
   longitude?: number | null;
+  old_price?: number | null;
 };
 
 const FAVORITES_STORAGE_KEY = 'varol_property_favorites';
 const VIEWED_STORAGE_KEY = 'varol_viewed_properties';
 const GOOGLE_MAPS_API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string | undefined;
+
+const LAND_PROPERTY_TYPES = new Set([
+  'land',
+  'arsa',
+  'tarla',
+  'bag',
+  'bahce',
+  'zeytinlik',
+  'tarim_arazisi',
+  'farm',
+  'field',
+  'plot',
+]);
+
+const COMMERCIAL_PROPERTY_TYPES = new Set([
+  'office',
+  'ofis',
+  'shop',
+  'dukkan',
+  'store',
+  'magaza',
+  'depo',
+  'warehouse',
+  'fabrika',
+  'factory',
+  'plaza',
+  'building',
+  'bina',
+  'hotel',
+  'otel',
+  'akaryakit_istasyonu',
+  'gas_station',
+  'ticari',
+  'commercial',
+]);
 
 export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyDetailPageProps) {
   const { language, t } = useLanguage();
@@ -111,13 +152,13 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
       if (readError) throw readError;
 
       const currentViews =
-        currentRow && typeof (currentRow as any).views === 'number'
-          ? (currentRow as any).views
+        currentRow && typeof (currentRow as { views?: unknown }).views === 'number'
+          ? ((currentRow as { views?: number }).views ?? 0)
           : 0;
 
       const { error: updateError } = await supabase
         .from('properties')
-        .update({ views: currentViews + 1 } as any)
+        .update({ views: currentViews + 1 } as never)
         .eq('id', propertyId);
 
       if (updateError) throw updateError;
@@ -326,24 +367,33 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
     setSelectedImage((prev) => (prev === property.images.length - 1 ? 0 : prev + 1));
   };
 
+  const propertyTypeValue = String(property?.property_type ?? '').toLowerCase();
+  const isLandLike = LAND_PROPERTY_TYPES.has(propertyTypeValue);
+  const isCommercialLike = COMMERCIAL_PROPERTY_TYPES.has(propertyTypeValue);
+
+  const oldPrice = (property as PropertyWithCoords | null)?.old_price ?? null;
+  const hasDiscount =
+    typeof oldPrice === 'number' &&
+    oldPrice > (property?.price ?? 0);
+
+  const discountPercent =
+    hasDiscount && property
+      ? Math.round(((oldPrice - property.price) / oldPrice) * 100)
+      : 0;
+
   const quickFacts = useMemo(() => {
     if (!property) return [];
 
     const facts: string[] = [];
-
     facts.push(`${property.area} m²`);
     facts.push(getPropertyTypeLabel(property.property_type, language));
 
-    if (property.rooms > 0) {
-      facts.push(
-        language === 'tr' ? `${property.rooms} Oda` : `${property.rooms} Rooms`
-      );
+    if (!isLandLike && !isCommercialLike && property.rooms > 0) {
+      facts.push(language === 'tr' ? `${property.rooms} Oda` : `${property.rooms} Rooms`);
     }
 
-    if (property.bathrooms > 0) {
-      facts.push(
-        language === 'tr' ? `${property.bathrooms} Banyo` : `${property.bathrooms} Bathrooms`
-      );
+    if (!isLandLike && !isCommercialLike && property.bathrooms > 0) {
+      facts.push(language === 'tr' ? `${property.bathrooms} Banyo` : `${property.bathrooms} Bathrooms`);
     }
 
     if (property.city) {
@@ -351,7 +401,49 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
     }
 
     return facts.slice(0, 5);
-  }, [property, language]);
+  }, [property, language, isLandLike, isCommercialLike]);
+
+  const topInfoItems = useMemo(() => {
+    if (!property) return [];
+
+    if (isLandLike || isCommercialLike) {
+      return [
+        {
+          key: 'type',
+          icon: Layers3,
+          label: language === 'tr' ? 'Tür' : 'Type',
+          value: getPropertyTypeLabel(property.property_type, language),
+        },
+        {
+          key: 'area',
+          icon: Maximize,
+          label: language === 'tr' ? 'Alan' : 'Area',
+          value: `${property.area} m²`,
+        },
+      ];
+    }
+
+    return [
+      {
+        key: 'rooms',
+        icon: Home,
+        label: language === 'tr' ? 'Oda' : 'Rooms',
+        value: property.rooms > 0 ? String(property.rooms) : '-',
+      },
+      {
+        key: 'bathrooms',
+        icon: Bath,
+        label: language === 'tr' ? 'Banyo' : 'Bath',
+        value: property.bathrooms > 0 ? String(property.bathrooms) : '-',
+      },
+      {
+        key: 'area',
+        icon: Maximize,
+        label: language === 'tr' ? 'Alan' : 'Area',
+        value: `${property.area} m²`,
+      },
+    ];
+  }, [property, language, isLandLike, isCommercialLike]);
 
   const highlightFeatures = useMemo(() => {
     if (!property) return [];
@@ -362,7 +454,7 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
       features.push(language === 'tr' ? 'Geniş metrekare avantajı' : 'Spacious floor area');
     }
 
-    if (property.rooms >= 3) {
+    if (!isLandLike && !isCommercialLike && property.rooms >= 3) {
       features.push(language === 'tr' ? 'Aile yaşamına uygun plan' : 'Suitable layout for family living');
     }
 
@@ -410,8 +502,8 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
       );
     }
 
-    return features.slice(0, 6);
-  }, [property, language]);
+    return features.slice(0, 4);
+  }, [property, language, isLandLike, isCommercialLike]);
 
   const investmentNote = useMemo(() => {
     if (!property) return '';
@@ -428,7 +520,9 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
       }
 
       if (property.city) {
-        notes.push(`${property.city}${property.district ? ` / ${property.district}` : ''} lokasyonu ilan değerini destekler.`);
+        notes.push(
+          `${property.city}${property.district ? ` / ${property.district}` : ''} lokasyonu ilan değerini destekler.`
+        );
       }
 
       if (property.featured) {
@@ -437,6 +531,10 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
 
       if (typeof property.views === 'number' && property.views > 50) {
         notes.push('İlan yüksek görüntülenme alarak dikkat çekmektedir.');
+      }
+
+      if (hasDiscount) {
+        notes.push(`Önceki fiyat üzerinden indirim uygulanmış fırsat portföyüdür.`);
       }
     } else {
       if (property.status === 'for_sale') {
@@ -460,10 +558,14 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
       if (typeof property.views === 'number' && property.views > 50) {
         notes.push('The listing is attracting strong attention with higher view counts.');
       }
+
+      if (hasDiscount) {
+        notes.push('This portfolio has a discounted opportunity price compared to its previous listing price.');
+      }
     }
 
     return notes.join(' ');
-  }, [property, language]);
+  }, [property, language, hasDiscount]);
 
   const seoTitle = useMemo(() => {
     if (!property) {
@@ -481,14 +583,15 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
     const parts: string[] = [];
 
     if (language === 'tr') {
-      parts.push(
-        `${property.city}${property.district ? `, ${property.district}` : ''} bölgesinde`
-      );
+      parts.push(`${property.city}${property.district ? `, ${property.district}` : ''} bölgesinde`);
       parts.push(`${property.area} m²`);
       parts.push(getStatusLabel(property.status, language));
       parts.push(getPropertyTypeLabel(property.property_type, language));
-      if (property.rooms > 0) parts.push(`${property.rooms} oda`);
-      if (property.bathrooms > 0) parts.push(`${property.bathrooms} banyo`);
+      if (!isLandLike && !isCommercialLike && property.rooms > 0) parts.push(`${property.rooms} oda`);
+      if (!isLandLike && !isCommercialLike && property.bathrooms > 0) parts.push(`${property.bathrooms} banyo`);
+      if (hasDiscount && typeof oldPrice === 'number') {
+        parts.push(`indirimli fiyat ${formatPrice(property.price, property.currency)}`);
+      }
       if (property.featured) parts.push('öne çıkan ilan');
       parts.push('detaylarını inceleyin.');
     } else {
@@ -501,13 +604,16 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
       if (property.city) {
         parts.push(`in ${property.city}${property.district ? `, ${property.district}` : ''}.`);
       }
-      if (property.rooms > 0) parts.push(`${property.rooms} rooms.`);
-      if (property.bathrooms > 0) parts.push(`${property.bathrooms} bathrooms.`);
+      if (!isLandLike && !isCommercialLike && property.rooms > 0) parts.push(`${property.rooms} rooms.`);
+      if (!isLandLike && !isCommercialLike && property.bathrooms > 0) parts.push(`${property.bathrooms} bathrooms.`);
+      if (hasDiscount && typeof oldPrice === 'number') {
+        parts.push(`Discounted price ${formatPrice(property.price, property.currency)}.`);
+      }
       if (property.featured) parts.push('Featured portfolio listing.');
     }
 
     return parts.join(' ');
-  }, [property, language]);
+  }, [property, language, isLandLike, isCommercialLike, hasDiscount, oldPrice]);
 
   const canonicalUrl = useMemo(() => {
     if (!property) return buildAbsoluteUrl('/properties');
@@ -562,16 +668,12 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
     const firstImage = images.length > 0 ? images[0] : undefined;
     const propertyUrl = `${window.location.origin}/properties/${property.id}`;
     const schemaType = getSchemaType(property.property_type);
-    const addressLocality = property.district
-      ? `${property.district}, ${property.city}`
-      : property.city;
+    const addressLocality = property.district ? `${property.district}, ${property.city}` : property.city;
 
     const floorSizeValue =
-      typeof property.net_area === 'number' && property.net_area > 0
-        ? property.net_area
-        : property.area;
+      typeof property.net_area === 'number' && property.net_area > 0 ? property.net_area : property.area;
 
-    const mainEntity: Record<string, any> = {
+    const mainEntity: Record<string, unknown> = {
       '@type': schemaType,
       name: property.title,
       description: property.description,
@@ -590,12 +692,9 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
         value: floorSizeValue,
         unitCode: 'MTK',
       },
-      numberOfRooms:
-        typeof property.rooms === 'number' && property.rooms > 0 ? property.rooms : undefined,
+      numberOfRooms: typeof property.rooms === 'number' && property.rooms > 0 ? property.rooms : undefined,
       numberOfBathroomsTotal:
-        typeof property.bathrooms === 'number' && property.bathrooms > 0
-          ? property.bathrooms
-          : undefined,
+        typeof property.bathrooms === 'number' && property.bathrooms > 0 ? property.bathrooms : undefined,
       additionalProperty: [
         {
           '@type': 'PropertyValue',
@@ -612,6 +711,15 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
           name: language === 'tr' ? 'Brüt Alan' : 'Gross Area',
           value: `${property.area} m²`,
         },
+        ...(hasDiscount && typeof oldPrice === 'number'
+          ? [
+              {
+                '@type': 'PropertyValue',
+                name: language === 'tr' ? 'Eski Fiyat' : 'Old Price',
+                value: formatPrice(oldPrice, property.currency),
+              },
+            ]
+          : []),
         ...(typeof property.net_area === 'number' && property.net_area > 0
           ? [
               {
@@ -670,23 +778,23 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
     };
 
     if (typeof latitude === 'number' && typeof longitude === 'number') {
-      mainEntity.geo = {
+      (mainEntity as Record<string, unknown>).geo = {
         '@type': 'GeoCoordinates',
         latitude,
         longitude,
       };
 
-      mainEntity.hasMap = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
+      (mainEntity as Record<string, unknown>).hasMap = `https://www.google.com/maps/search/?api=1&query=${latitude},${longitude}`;
     }
 
     if (firstImage) {
-      mainEntity.primaryImageOfPage = {
+      (mainEntity as Record<string, unknown>).primaryImageOfPage = {
         '@type': 'ImageObject',
         url: firstImage,
       };
     }
 
-    const offer: Record<string, any> = {
+    const offer: Record<string, unknown> = {
       '@type': 'Offer',
       url: propertyUrl,
       price: property.price,
@@ -705,7 +813,7 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
       },
     };
 
-    const listing: Record<string, any> = {
+    const listing: Record<string, unknown> = {
       '@context': 'https://schema.org',
       '@type': 'RealEstateListing',
       name: property.title,
@@ -725,12 +833,12 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
     };
 
     return JSON.stringify(listing);
-  }, [property, language]);
+  }, [property, language, hasDiscount, oldPrice]);
 
   const details = useMemo(() => {
     if (!property) return [];
 
-    return [
+    const baseItems = [
       {
         label: language === 'tr' ? 'İlan Durumu' : 'Listing Status',
         value: getStatusLabel(property.status, language),
@@ -752,6 +860,32 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
         value: property.gross_area ? `${property.gross_area} m²` : '-',
       },
       {
+        label: language === 'tr' ? 'Cephe' : 'Frontage',
+        value: getFrontageLabel(property.frontage, language),
+      },
+      {
+        label: language === 'tr' ? 'Tapu Durumu' : 'Title Deed Status',
+        value: getDeedStatusLabel(property.deed_status, language),
+      },
+      {
+        label: language === 'tr' ? 'Kullanım Durumu' : 'Usage Status',
+        value: getUsageStatusLabel(property.usage_status, language),
+      },
+    ];
+
+    if (hasDiscount && typeof oldPrice === 'number') {
+      baseItems.unshift({
+        label: language === 'tr' ? 'Eski Fiyat' : 'Old Price',
+        value: formatPrice(oldPrice, property.currency),
+      });
+    }
+
+    if (isLandLike) {
+      return baseItems;
+    }
+
+    const extendedItems = [
+      {
         label: language === 'tr' ? 'Oda Sayısı' : 'Rooms',
         value: property.rooms > 0 ? String(property.rooms) : '-',
       },
@@ -761,10 +895,7 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
       },
       {
         label: language === 'tr' ? 'Kat' : 'Floor',
-        value:
-          typeof property.floor === 'number' && property.floor >= 0
-            ? String(property.floor)
-            : '-',
+        value: typeof property.floor === 'number' && property.floor >= 0 ? String(property.floor) : '-',
       },
       {
         label: language === 'tr' ? 'Toplam Kat' : 'Total Floors',
@@ -790,18 +921,6 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
           typeof property.dues === 'number' && property.dues > 0
             ? formatPrice(property.dues, property.currency)
             : '-',
-      },
-      {
-        label: language === 'tr' ? 'Cephe' : 'Frontage',
-        value: getFrontageLabel(property.frontage, language),
-      },
-      {
-        label: language === 'tr' ? 'Tapu Durumu' : 'Title Deed Status',
-        value: getDeedStatusLabel(property.deed_status, language),
-      },
-      {
-        label: language === 'tr' ? 'Kullanım Durumu' : 'Usage Status',
-        value: getUsageStatusLabel(property.usage_status, language),
       },
       {
         label: language === 'tr' ? 'Site İçinde' : 'In Complex',
@@ -903,7 +1022,9 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
             : 'No',
       },
     ];
-  }, [property, language]);
+
+    return [...baseItems, ...extendedItems];
+  }, [property, language, isLandLike, hasDiscount, oldPrice]);
 
   if (loading) {
     return <div className="pt-32 text-center">{t('common.loading')}</div>;
@@ -938,27 +1059,23 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
         <link rel="canonical" href={canonicalUrl} />
         {pageImage ? <meta property="og:image" content={pageImage} /> : null}
         {pageImage ? <meta name="twitter:image" content={pageImage} /> : null}
-        {realEstateSchemaJson ? (
-          <script type="application/ld+json">{realEstateSchemaJson}</script>
-        ) : null}
-        {breadcrumbSchemaJson ? (
-          <script type="application/ld+json">{breadcrumbSchemaJson}</script>
-        ) : null}
+        {realEstateSchemaJson ? <script type="application/ld+json">{realEstateSchemaJson}</script> : null}
+        {breadcrumbSchemaJson ? <script type="application/ld+json">{breadcrumbSchemaJson}</script> : null}
       </Helmet>
 
-      <div className="min-h-screen bg-gray-50 pt-20 pb-28 lg:pb-12">
+      <div className="min-h-screen bg-gray-50 pt-20 pb-32 lg:pb-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <button
             type="button"
             onClick={() => onNavigate('properties')}
-            className="mb-6 flex items-center text-gray-600 transition-colors hover:text-cta"
+            className="mb-4 flex items-center text-gray-600 transition-colors hover:text-cta"
           >
             <ArrowLeft className="mr-2 h-5 w-5" />
             {t('common.back')}
           </button>
 
-          <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1.15fr_0.85fr]">
-            <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+            <div className="space-y-5">
               <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
                 <div className="relative aspect-[16/10] overflow-hidden bg-gray-200">
                   {hasImages ? (
@@ -969,22 +1086,28 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
                         className="h-full w-full object-cover"
                       />
 
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent" />
 
-                      <div className="absolute left-4 top-4 flex flex-wrap gap-2">
+                      <div className="absolute left-3 top-3 flex flex-wrap gap-2 sm:left-4 sm:top-4">
                         <span
-                          className={`${getStatusColor(property.status)} rounded-full px-3 py-1 text-xs font-semibold text-white`}
+                          className={`${getStatusColor(property.status)} rounded-full px-3 py-1 text-[11px] font-semibold text-white`}
                         >
                           {getStatusLabel(property.status, language)}
                         </span>
 
                         {property.featured && (
-                          <span className="rounded-full bg-amber-500 px-3 py-1 text-xs font-semibold text-white">
+                          <span className="rounded-full bg-amber-500 px-3 py-1 text-[11px] font-semibold text-white">
                             {language === 'tr' ? 'Öne Çıkan' : 'Featured'}
                           </span>
                         )}
 
-                        <span className="rounded-full bg-black/55 px-3 py-1 text-xs font-medium text-white backdrop-blur-sm">
+                        {hasDiscount ? (
+                          <span className="rounded-full bg-red-600 px-3 py-1 text-[11px] font-semibold text-white">
+                            {language === 'tr' ? 'İndirimli' : 'Discount'}
+                          </span>
+                        ) : null}
+
+                        <span className="rounded-full bg-black/55 px-3 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
                           {selectedImage + 1} / {images.length}
                         </span>
                       </div>
@@ -994,7 +1117,7 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
                           <button
                             type="button"
                             onClick={goPrevImage}
-                            className="absolute left-4 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-gray-800 shadow-md transition hover:bg-white"
+                            className="absolute left-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-gray-800 shadow-md transition hover:bg-white sm:left-4 sm:h-11 sm:w-11"
                           >
                             <ChevronLeft className="h-5 w-5" />
                           </button>
@@ -1002,7 +1125,7 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
                           <button
                             type="button"
                             onClick={goNextImage}
-                            className="absolute right-4 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-gray-800 shadow-md transition hover:bg-white"
+                            className="absolute right-3 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-gray-800 shadow-md transition hover:bg-white sm:right-4 sm:h-11 sm:w-11"
                           >
                             <ChevronRight className="h-5 w-5" />
                           </button>
@@ -1036,12 +1159,12 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
                 )}
               </div>
 
-              <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-                <div className="mb-4 flex flex-wrap gap-2">
+              <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
+                <div className="mb-3 flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={toggleFavorite}
-                    className={`inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition ${
+                    className={`inline-flex items-center gap-2 rounded-xl border px-3.5 py-2 text-sm font-medium transition ${
                       isFavorite
                         ? 'border-red-200 bg-red-50 text-red-600'
                         : 'border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100'
@@ -1060,7 +1183,7 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
                   <button
                     type="button"
                     onClick={shareOnWhatsApp}
-                    className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100"
+                    className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100"
                   >
                     <Share2 className="h-4 w-4" />
                     WhatsApp
@@ -1069,133 +1192,150 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
                   <button
                     type="button"
                     onClick={copyPropertyLink}
-                    className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
+                    className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3.5 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
                   >
                     <Copy className="h-4 w-4" />
                     {language === 'tr' ? 'Linki Kopyala' : 'Copy Link'}
                   </button>
                 </div>
 
-                <h1 className="text-3xl font-bold leading-tight text-gray-900">{property.title}</h1>
-
-                <div className="mt-3 text-3xl font-bold text-cta">
-                  {formatPrice(property.price, property.currency)}
-                </div>
-
-                <div className="mt-4 flex items-start gap-2 text-gray-500">
-                  <MapPin className="mt-0.5 h-5 w-5 shrink-0" />
+                <div className="flex flex-col gap-4">
                   <div>
-                    <div>
-                      {property.city}
-                      {property.district ? `, ${property.district}` : ''}
-                    </div>
-                    {property.location ? (
-                      <div className="mt-1 text-sm text-gray-400">{property.location}</div>
+                    <h1 className="text-2xl font-bold leading-tight text-gray-900 sm:text-3xl">
+                      {property.title}
+                    </h1>
+
+                    {hasDiscount && typeof oldPrice === 'number' ? (
+                      <div className="mt-3 flex flex-wrap items-center gap-3">
+                        <div className="text-lg font-semibold text-gray-400 line-through sm:text-xl">
+                          {formatPrice(oldPrice, property.currency)}
+                        </div>
+
+                        <div className="inline-flex items-center gap-1 rounded-full bg-red-50 px-3 py-1 text-sm font-bold text-red-600">
+                          <BadgePercent className="h-4 w-4" />
+                          %{discountPercent}
+                        </div>
+                      </div>
                     ) : null}
-                  </div>
-                </div>
 
-                {quickFacts.length > 0 && (
-                  <div className="mt-5 flex flex-wrap gap-2">
-                    {quickFacts.map((fact) => (
-                      <span
-                        key={fact}
-                        className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700"
-                      >
-                        {fact}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <div className="rounded-2xl bg-gray-50 px-4 py-3">
-                    <div className="text-xs text-gray-400">
-                      {language === 'tr' ? 'Tür' : 'Type'}
+                    <div className="mt-2 text-3xl font-extrabold leading-none text-cta sm:text-4xl">
+                      {formatPrice(property.price, property.currency)}
                     </div>
-                    <div className="mt-1 font-medium text-gray-800">
-                      {getPropertyTypeLabel(property.property_type, language)}
+
+                    <div className="mt-3 flex items-start gap-2 text-sm text-gray-500 sm:text-base">
+                      <MapPin className="mt-0.5 h-4 w-4 shrink-0 sm:h-5 sm:w-5" />
+                      <div className="min-w-0">
+                        <div>
+                          {property.city}
+                          {property.district ? `, ${property.district}` : ''}
+                        </div>
+                        {property.location ? (
+                          <div className="mt-1 text-xs text-gray-400 sm:text-sm">{property.location}</div>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
 
-                  <div className="rounded-2xl bg-gray-50 px-4 py-3">
-                    <div className="text-xs text-gray-400">m²</div>
-                    <div className="mt-1 font-medium text-gray-800">{property.area}</div>
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {topInfoItems.map((item) => {
+                      const Icon = item.icon;
+
+                      return (
+                        <div key={item.key} className="rounded-2xl bg-gray-50 px-3 py-3 sm:px-4">
+                          <div className="flex items-center gap-2 text-gray-400">
+                            <Icon className="h-4 w-4" />
+                            <span className="text-[11px] sm:text-xs">{item.label}</span>
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-gray-800 sm:text-base">
+                            {item.value}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
 
-                  <div className="rounded-2xl bg-gray-50 px-4 py-3">
-                    <div className="text-xs text-gray-400">
-                      {language === 'tr' ? 'Oda' : 'Rooms'}
+                  {quickFacts.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {quickFacts.map((fact) => (
+                        <span
+                          key={fact}
+                          className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-medium text-slate-700 sm:text-xs"
+                        >
+                          {fact}
+                        </span>
+                      ))}
                     </div>
-                    <div className="mt-1 font-medium text-gray-800">
-                      {property.rooms > 0 ? property.rooms : '-'}
-                    </div>
-                  </div>
-
-                  <div className="rounded-2xl bg-gray-50 px-4 py-3">
-                    <div className="text-xs text-gray-400">
-                      {language === 'tr' ? 'Banyo' : 'Bath'}
-                    </div>
-                    <div className="mt-1 font-medium text-gray-800">
-                      {property.bathrooms > 0 ? property.bathrooms : '-'}
-                    </div>
-                  </div>
+                  )}
                 </div>
               </div>
 
-              {highlightFeatures.length > 0 && (
-                <div className="rounded-3xl border border-emerald-100 bg-white p-6 shadow-sm">
+              {(highlightFeatures.length > 0 || investmentNote) && (
+                <div className="rounded-3xl border border-emerald-100 bg-white p-4 shadow-sm sm:p-6">
                   <div className="mb-4 flex items-center gap-2">
                     <Sparkles className="h-5 w-5 text-emerald-600" />
-                    <h2 className="text-xl font-bold text-gray-900">
-                      {language === 'tr' ? 'Öne Çıkan Özellikler' : 'Highlighted Features'}
+                    <h2 className="text-lg font-bold text-gray-900 sm:text-xl">
+                      {language === 'tr' ? 'Öne Çıkan Notlar' : 'Highlighted Notes'}
                     </h2>
                   </div>
 
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {highlightFeatures.map((feature) => (
-                      <div
-                        key={feature}
-                        className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"
-                      >
-                        {feature}
+                  {highlightFeatures.length > 0 ? (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      {highlightFeatures.map((feature) => (
+                        <div
+                          key={feature}
+                          className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"
+                        >
+                          {feature}
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {investmentNote ? (
+                    <div className={highlightFeatures.length > 0 ? 'mt-4 rounded-2xl bg-amber-50 px-4 py-4' : ''}>
+                      <div className="mb-2 flex items-center gap-2">
+                        <TrendingUp className="h-4 w-4 text-amber-600" />
+                        <span className="text-sm font-semibold text-gray-900">
+                          {language === 'tr' ? 'Yatırım / Değer Notu' : 'Investment / Value Note'}
+                        </span>
                       </div>
-                    ))}
-                  </div>
+                      <p className="text-sm leading-6 text-gray-600">{investmentNote}</p>
+                    </div>
+                  ) : null}
                 </div>
               )}
 
-              <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-                <h2 className="mb-4 text-xl font-bold text-gray-900">{t('detail.description')}</h2>
+              <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
+                <h2 className="mb-4 text-lg font-bold text-gray-900 sm:text-xl">{t('detail.description')}</h2>
                 <p className="whitespace-pre-line leading-7 text-gray-600">{property.description}</p>
               </div>
 
-              <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-                <h2 className="mb-4 text-xl font-bold text-gray-900">
+              <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
+                <h2 className="mb-4 text-lg font-bold text-gray-900 sm:text-xl">
                   {language === 'tr' ? 'Temel Özellikler' : 'Key Features'}
                 </h2>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   {details.map((item) => (
                     <div
                       key={item.label}
                       className="flex items-center justify-between gap-4 rounded-2xl bg-gray-50 px-4 py-3"
                     >
                       <span className="text-sm text-gray-500">{item.label}</span>
-                      <span className="text-right font-medium text-gray-800">{item.value}</span>
+                      <span className="text-right text-sm font-medium text-gray-800 sm:text-base">{item.value}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
               {hasMap && GOOGLE_MAPS_API_KEY && (
-                <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-                  <h2 className="mb-4 text-xl font-bold text-gray-900">
+                <div className="rounded-3xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
+                  <h2 className="mb-4 text-lg font-bold text-gray-900 sm:text-xl">
                     {language === 'tr' ? 'Konum' : 'Location'}
                   </h2>
 
                   <div className="overflow-hidden rounded-2xl border border-gray-200">
-                    <div className="h-[340px] w-full">
+                    <div className="h-[320px] w-full sm:h-[340px]">
                       <APIProvider apiKey={GOOGLE_MAPS_API_KEY} language="tr" region="TR">
                         <Map
                           defaultCenter={{ lat: latitude, lng: longitude }}
@@ -1219,142 +1359,181 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
               )}
             </div>
 
-            <div className="space-y-6 lg:sticky lg:top-24 lg:self-start">
-              <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-                <div className="mb-4 text-sm font-medium text-gray-500">
-                  {language === 'tr' ? 'İlan Durumu' : 'Listing Status'}
-                </div>
+            <div className="space-y-5 lg:sticky lg:top-24 lg:self-start">
+              <div className="overflow-hidden rounded-3xl border border-gray-200 bg-white shadow-sm">
+                <div className="border-b border-gray-100 bg-gradient-to-br from-white to-emerald-50 p-5">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div className="text-sm font-medium text-gray-500">
+                      {language === 'tr' ? 'Satış Paneli' : 'Sales Panel'}
+                    </div>
 
-                <div
-                  className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold text-white ${getStatusColor(
-                    property.status
-                  )}`}
-                >
-                  {getStatusLabel(property.status, language)}
-                </div>
-
-                <div className="mt-5 text-3xl font-bold text-cta">
-                  {formatPrice(property.price, property.currency)}
-                </div>
-
-                <div className="mt-5 space-y-3">
-                  <button
-                    type="button"
-                    onClick={shareOnWhatsApp}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white transition hover:bg-emerald-700"
-                  >
-                    <Share2 className="h-4 w-4" />
-                    WhatsApp ile Sor
-                  </button>
-
-                  {property.contact_phone ? (
-                    <a
-                      href={`tel:${property.contact_phone}`}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-brand bg-brand/5 px-4 py-3 font-semibold text-brand transition hover:bg-brand/10"
+                    <div
+                      className={`inline-flex rounded-full px-3 py-1 text-[11px] font-semibold text-white ${getStatusColor(
+                        property.status
+                      )}`}
                     >
-                      <Phone className="h-4 w-4" />
-                      {language === 'tr' ? 'Hemen Ara' : 'Call Now'}
-                    </a>
+                      {getStatusLabel(property.status, language)}
+                    </div>
+                  </div>
+
+                  {hasDiscount && typeof oldPrice === 'number' ? (
+                    <div className="mb-2 flex flex-wrap items-center gap-3">
+                      <div className="text-base font-semibold text-gray-400 line-through">
+                        {formatPrice(oldPrice, property.currency)}
+                      </div>
+
+                      <div className="inline-flex items-center gap-1 rounded-full bg-red-50 px-3 py-1 text-sm font-bold text-red-600">
+                        <BadgePercent className="h-4 w-4" />
+                        %{discountPercent}
+                      </div>
+                    </div>
                   ) : null}
+
+                  <div className="text-3xl font-extrabold text-cta">
+                    {formatPrice(property.price, property.currency)}
+                  </div>
+
+                  <div className="mt-3 text-sm text-gray-500">
+                    {property.city}
+                    {property.district ? `, ${property.district}` : ''}
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={shareOnWhatsApp}
+                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 font-semibold text-white transition hover:bg-emerald-700"
+                    >
+                      <Share2 className="h-4 w-4" />
+                      {language === 'tr' ? 'WhatsApp’tan Bilgi Al' : 'Get Info on WhatsApp'}
+                    </button>
+
+                    {property.contact_phone ? (
+                      <a
+                        href={`tel:${property.contact_phone}`}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 font-semibold text-white transition hover:bg-slate-800"
+                      >
+                        <Phone className="h-4 w-4" />
+                        {language === 'tr' ? 'Hemen Ara' : 'Call Now'}
+                      </a>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={copyPropertyLink}
+                        className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 font-semibold text-white transition hover:bg-slate-800"
+                      >
+                        <Copy className="h-4 w-4" />
+                        {language === 'tr' ? 'Link Kopyala' : 'Copy Link'}
+                      </button>
+                    )}
+                  </div>
 
                   <button
                     type="button"
                     onClick={copyPropertyLink}
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 font-medium text-gray-700 transition hover:bg-gray-100"
+                    className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 font-medium text-gray-700 transition hover:bg-gray-100"
                   >
                     <Copy className="h-4 w-4" />
                     {language === 'tr' ? 'İlan Linkini Kopyala' : 'Copy Listing Link'}
                   </button>
                 </div>
-              </div>
 
-              {investmentNote ? (
-                <div className="rounded-3xl border border-amber-200 bg-white p-6 shadow-sm">
+                <div className="p-5">
                   <div className="mb-3 flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5 text-amber-600" />
-                    <h2 className="text-xl font-bold text-gray-900">
-                      {language === 'tr' ? 'Yatırım / Değer Notu' : 'Investment / Value Note'}
+                    <Building2 className="h-5 w-5 text-slate-700" />
+                    <h2 className="text-lg font-bold text-gray-900">
+                      {language === 'tr' ? 'Hızlı Bilgi' : 'Quick Info'}
                     </h2>
                   </div>
 
-                  <p className="text-sm leading-6 text-gray-600">{investmentNote}</p>
-                </div>
-              ) : null}
+                  <div className="space-y-3 text-sm text-gray-700">
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-gray-500">{language === 'tr' ? 'Tür' : 'Type'}</span>
+                      <span className="text-right font-medium">
+                        {getPropertyTypeLabel(property.property_type, language)}
+                      </span>
+                    </div>
 
-              <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-                <div className="mb-3 flex items-center gap-2">
-                  <Building2 className="h-5 w-5 text-slate-700" />
-                  <h2 className="text-xl font-bold text-gray-900">
-                    {language === 'tr' ? 'Hızlı Bilgi' : 'Quick Info'}
-                  </h2>
-                </div>
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-gray-500">{language === 'tr' ? 'Alan' : 'Area'}</span>
+                      <span className="text-right font-medium">{property.area} m²</span>
+                    </div>
 
-                <div className="space-y-3 text-sm text-gray-700">
-                  <div className="flex items-start justify-between gap-3">
-                    <span className="text-gray-500">{language === 'tr' ? 'Tür' : 'Type'}</span>
-                    <span className="text-right font-medium">
-                      {getPropertyTypeLabel(property.property_type, language)}
-                    </span>
-                  </div>
+                    {!isLandLike && !isCommercialLike ? (
+                      <>
+                        <div className="flex items-start justify-between gap-3">
+                          <span className="text-gray-500">{language === 'tr' ? 'Oda' : 'Rooms'}</span>
+                          <span className="text-right font-medium">
+                            {property.rooms > 0 ? property.rooms : '-'}
+                          </span>
+                        </div>
 
-                  <div className="flex items-start justify-between gap-3">
-                    <span className="text-gray-500">{language === 'tr' ? 'Durum' : 'Status'}</span>
-                    <span className="text-right font-medium">
-                      {getStatusLabel(property.status, language)}
-                    </span>
-                  </div>
+                        <div className="flex items-start justify-between gap-3">
+                          <span className="text-gray-500">{language === 'tr' ? 'Banyo' : 'Bath'}</span>
+                          <span className="text-right font-medium">
+                            {property.bathrooms > 0 ? property.bathrooms : '-'}
+                          </span>
+                        </div>
+                      </>
+                    ) : null}
 
-                  <div className="flex items-start justify-between gap-3">
-                    <span className="text-gray-500">{language === 'tr' ? 'Konum' : 'Location'}</span>
-                    <span className="text-right font-medium">
-                      {property.city}
-                      {property.district ? `, ${property.district}` : ''}
-                    </span>
-                  </div>
+                    {hasDiscount && typeof oldPrice === 'number' ? (
+                      <div className="flex items-start justify-between gap-3">
+                        <span className="text-gray-500">{language === 'tr' ? 'Eski Fiyat' : 'Old Price'}</span>
+                        <span className="text-right font-medium line-through text-gray-400">
+                          {formatPrice(oldPrice, property.currency)}
+                        </span>
+                      </div>
+                    ) : null}
 
-                  <div className="flex items-start justify-between gap-3">
-                    <span className="text-gray-500">{language === 'tr' ? 'İlan Görseli' : 'Photos'}</span>
-                    <span className="text-right font-medium">{images.length}</span>
-                  </div>
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-gray-500">{language === 'tr' ? 'Konum' : 'Location'}</span>
+                      <span className="text-right font-medium">
+                        {property.city}
+                        {property.district ? `, ${property.district}` : ''}
+                      </span>
+                    </div>
 
-                  <div className="flex items-start justify-between gap-3">
-                    <span className="text-gray-500">{language === 'tr' ? 'Görüntülenme' : 'Views'}</span>
-                    <span className="text-right font-medium">
-                      {typeof property.views === 'number' ? property.views : 0}
-                    </span>
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-gray-500">{language === 'tr' ? 'Görsel' : 'Photos'}</span>
+                      <span className="text-right font-medium">{images.length}</span>
+                    </div>
+
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-gray-500">{language === 'tr' ? 'Görüntülenme' : 'Views'}</span>
+                      <span className="text-right font-medium">
+                        {typeof property.views === 'number' ? property.views : 0}
+                      </span>
+                    </div>
+
+                    {(property.contact_name || property.contact_phone) && (
+                      <div className="mt-4 rounded-2xl bg-gray-50 px-4 py-4">
+                        <div className="mb-2 text-sm font-semibold text-gray-900">
+                          {language === 'tr' ? 'İletişim Bilgileri' : 'Contact Information'}
+                        </div>
+
+                        {property.contact_name ? (
+                          <div className="text-sm text-gray-700">
+                            <span className="font-medium">{language === 'tr' ? 'Yetkili: ' : 'Contact: '}</span>
+                            {property.contact_name}
+                          </div>
+                        ) : null}
+
+                        {property.contact_phone ? (
+                          <div className="mt-1 text-sm text-gray-700">
+                            <span className="font-medium">{language === 'tr' ? 'Telefon: ' : 'Phone: '}</span>
+                            {property.contact_phone}
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
-
-              {(property.contact_name || property.contact_phone) && (
-                <div className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-                  <h2 className="mb-4 text-xl font-bold text-gray-900">
-                    {language === 'tr' ? 'İletişim Bilgileri' : 'Contact Information'}
-                  </h2>
-
-                  {property.contact_name ? (
-                    <div className="mb-3 text-gray-700">
-                      <span className="font-medium">
-                        {language === 'tr' ? 'Yetkili: ' : 'Contact: '}
-                      </span>
-                      {property.contact_name}
-                    </div>
-                  ) : null}
-
-                  {property.contact_phone ? (
-                    <div className="text-gray-700">
-                      <span className="font-medium">
-                        {language === 'tr' ? 'Telefon: ' : 'Phone: '}
-                      </span>
-                      {property.contact_phone}
-                    </div>
-                  ) : null}
-                </div>
-              )}
             </div>
           </div>
 
-          <div className="mt-12">
+          <div className="mt-10">
             <div className="mb-6 flex items-center justify-between">
               <h2 className="text-2xl font-bold text-gray-900">
                 {language === 'tr' ? 'Benzer İlanlar' : 'Similar Listings'}
@@ -1387,15 +1566,49 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
           </div>
         </div>
 
-        {property && (
-          <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white/95 p-3 shadow-2xl backdrop-blur lg:hidden">
-            <div className="mx-auto flex max-w-7xl gap-3">
+        <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white/95 p-3 shadow-2xl backdrop-blur lg:hidden">
+          <div className="mx-auto max-w-7xl">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="truncate text-xs font-medium text-gray-500">
+                  {getPropertyTypeLabel(property.property_type, language)}
+                </div>
+
+                {hasDiscount && typeof oldPrice === 'number' ? (
+                  <div className="truncate text-xs font-semibold text-gray-400 line-through">
+                    {formatPrice(oldPrice, property.currency)}
+                  </div>
+                ) : null}
+
+                <div className="truncate text-base font-extrabold text-cta">
+                  {formatPrice(property.price, property.currency)}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {hasDiscount ? (
+                  <div className="inline-flex rounded-full bg-red-50 px-3 py-1 text-[11px] font-bold text-red-600">
+                    %{discountPercent}
+                  </div>
+                ) : null}
+
+                <div
+                  className={`inline-flex shrink-0 rounded-full px-3 py-1 text-[11px] font-semibold text-white ${getStatusColor(
+                    property.status
+                  )}`}
+                >
+                  {getStatusLabel(property.status, language)}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
               <button
                 type="button"
                 onClick={shareOnWhatsApp}
                 className="flex-1 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-emerald-700"
               >
-                WhatsApp
+                {language === 'tr' ? 'WhatsApp’tan Bilgi Al' : 'WhatsApp Info'}
               </button>
 
               {property.contact_phone ? (
@@ -1403,7 +1616,7 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
                   href={`tel:${property.contact_phone}`}
                   className="flex-1 rounded-xl bg-slate-900 px-4 py-3 text-center text-sm font-bold text-white transition hover:bg-slate-800"
                 >
-                  {language === 'tr' ? 'Ara' : 'Call'}
+                  {language === 'tr' ? 'Hemen Ara' : 'Call Now'}
                 </a>
               ) : (
                 <button
@@ -1416,7 +1629,7 @@ export default function PropertyDetailPage({ propertyId, onNavigate }: PropertyD
               )}
             </div>
           </div>
-        )}
+        </div>
       </div>
     </>
   );

@@ -17,6 +17,8 @@ const LoginPage = lazy(() => import('./pages/LoginPage'));
 const AdminPage = lazy(() => import('./pages/AdminPage'));
 const GuidePage = lazy(() => import('./pages/GuidePage'));
 const GuideDetailPage = lazy(() => import('./pages/GuideDetailPage'));
+const ProjectsPage = lazy(() => import('./pages/ProjectsPage'));
+const AboutPage = lazy(() => import('./pages/AboutPage'));
 const AiChatWidget = lazy(() => import('./components/AiChatWidget'));
 
 type Page =
@@ -30,7 +32,9 @@ type Page =
   | 'login'
   | 'admin'
   | 'guide'
-  | 'guide-detail';
+  | 'guide-detail'
+  | 'projects'
+  | 'about';
 
 function PageLoader() {
   return (
@@ -62,6 +66,8 @@ function App() {
       admin: '/admin',
       guide: '/rehber',
       guideDetail: (slug: string) => `/rehber/${slug}`,
+      projects: '/projects',
+      about: '/about',
     };
   }, []);
 
@@ -91,6 +97,16 @@ function App() {
 
     if (path === '/rehber') {
       setCurrentPage('guide');
+      return;
+    }
+
+    if (path === '/projects') {
+      setCurrentPage('projects');
+      return;
+    }
+
+    if (path === '/about') {
+      setCurrentPage('about');
       return;
     }
 
@@ -145,6 +161,7 @@ function App() {
       url = routes.home;
       setSelectedPropertyId(null);
       setSelectedVehicleId(null);
+      setSelectedGuideSlug(null);
     } else if (page === 'properties') {
       url = routes.properties;
       setSelectedPropertyId(null);
@@ -161,6 +178,11 @@ function App() {
       url = routes.admin;
     } else if (page === 'guide') {
       url = routes.guide;
+      setSelectedGuideSlug(null);
+    } else if (page === 'projects') {
+      url = routes.projects;
+    } else if (page === 'about') {
+      url = routes.about;
     } else if (page === 'guide-detail' && id) {
       url = routes.guideDetail(id);
       setSelectedGuideSlug(id);
@@ -200,6 +222,12 @@ function App() {
         ) : (
           <GuidePage onNavigate={handleNavigate} />
         );
+
+      case 'projects':
+        return <ProjectsPage onNavigate={handleNavigate} />;
+
+      case 'about':
+        return <AboutPage onNavigate={handleNavigate} />;
 
       case 'property-detail':
         return selectedPropertyId ? (

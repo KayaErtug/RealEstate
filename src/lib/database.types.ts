@@ -45,6 +45,7 @@ export interface Database {
           property_type: string;
           status: string;
           price: number;
+          old_price: number | null;
           currency: string;
           location: string;
           city: string;
@@ -72,6 +73,8 @@ export interface Database {
           elevator: boolean;
           balcony: boolean;
           garden: boolean;
+          latitude: number | null;
+          longitude: number | null;
           images: string[];
           moderation_status: string;
           approved_at: string | null;
@@ -90,6 +93,7 @@ export interface Database {
           property_type: string;
           status: string;
           price: number;
+          old_price?: number | null;
           currency: string;
           location: string;
           city: string;
@@ -117,6 +121,8 @@ export interface Database {
           elevator?: boolean;
           balcony?: boolean;
           garden?: boolean;
+          latitude?: number | null;
+          longitude?: number | null;
           images?: string[];
           moderation_status?: string;
           approved_at?: string | null;
@@ -124,6 +130,7 @@ export interface Database {
           contact_name?: string | null;
           contact_phone?: string | null;
           featured?: boolean;
+          views?: number;
           user_id?: string | null;
         };
         Update: {
@@ -132,6 +139,7 @@ export interface Database {
           property_type?: string;
           status?: string;
           price?: number;
+          old_price?: number | null;
           currency?: string;
           location?: string;
           city?: string;
@@ -159,6 +167,8 @@ export interface Database {
           elevator?: boolean;
           balcony?: boolean;
           garden?: boolean;
+          latitude?: number | null;
+          longitude?: number | null;
           images?: string[];
           moderation_status?: string;
           approved_at?: string | null;
@@ -271,6 +281,7 @@ export interface Database {
           contact_name?: string | null;
           contact_phone?: string | null;
           featured?: boolean;
+          views?: number;
           user_id?: string | null;
         };
         Update: {

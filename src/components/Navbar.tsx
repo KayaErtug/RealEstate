@@ -14,6 +14,8 @@ import {
   MessageCircle,
   FolderKanban,
   Info,
+  ChevronRight,
+  ShieldCheck,
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useLanguage } from "../contexts/LanguageContext";
@@ -77,7 +79,7 @@ export default function Navbar({ currentPage, onNavigate }: NavbarProps) {
         icon: MessageCircle,
       },
       {
-        id: user ? "admin" : "contact",
+        id: user ? "admin" : "login",
         label: language === "tr" ? "Hesap" : "Account",
         icon: User,
       },
@@ -95,13 +97,29 @@ export default function Navbar({ currentPage, onNavigate }: NavbarProps) {
     setMobileMenuOpen(false);
   };
 
+  const isMenuItemActive = (itemId: string) => {
+    if (itemId === "properties") {
+      return currentPage === "properties" || currentPage === "property-detail";
+    }
+
+    if (itemId === "vehicles") {
+      return currentPage === "vehicles" || currentPage === "vehicle-detail";
+    }
+
+    if (itemId === "guide") {
+      return currentPage === "guide" || currentPage === "guide-detail";
+    }
+
+    return currentPage === itemId;
+  };
+
   const isBottomNavActive = (itemId: string) => {
     if (itemId === "properties") {
       return currentPage === "properties" || currentPage === "property-detail";
     }
 
-    if (itemId === "contact") {
-      return currentPage === "contact";
+    if (itemId === "login") {
+      return currentPage === "login";
     }
 
     if (itemId === "admin") {
@@ -170,7 +188,7 @@ export default function Navbar({ currentPage, onNavigate }: NavbarProps) {
                   className="w-full text-left text-sm text-gray-500"
                 >
                   {language === "tr"
-                    ? 'Satılık, kiralık, araç ilanı ara...'
+                    ? "Satılık, kiralık, araç ilanı ara..."
                     : "Search sale, rent or vehicle listings..."}
                 </button>
               </div>
@@ -208,19 +226,31 @@ export default function Navbar({ currentPage, onNavigate }: NavbarProps) {
                       : "bg-cta text-white hover:bg-cta-hover"
                   }`}
                 >
-                  <User className="h-4 w-4" />
-                  <span>{language === "tr" ? "Hesap" : "Account"}</span>
+                  <ShieldCheck className="h-4 w-4" />
+                  <span>{language === "tr" ? "Admin Paneli" : "Admin Panel"}</span>
                 </button>
               ) : (
                 <button
                   type="button"
-                  onClick={() => onNavigate("contact")}
-                  className="inline-flex items-center gap-2 rounded-xl bg-cta px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-cta-hover"
+                  onClick={() => onNavigate("login")}
+                  className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition ${
+                    currentPage === "login"
+                      ? "bg-brand text-white"
+                      : "bg-cta text-white hover:bg-cta-hover"
+                  }`}
                 >
-                  <MessageCircle className="h-4 w-4" />
-                  <span>{language === "tr" ? "İletişim" : "Contact"}</span>
+                  <User className="h-4 w-4" />
+                  <span>{t("nav.login")}</span>
                 </button>
               )}
+
+              <button
+                type="button"
+                onClick={() => onNavigate("contact")}
+                className="hidden rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:bg-gray-50 xl:inline-flex"
+              >
+                {language === "tr" ? "İletişim" : "Contact"}
+              </button>
 
               {LangToggle}
             </div>
@@ -239,6 +269,7 @@ export default function Navbar({ currentPage, onNavigate }: NavbarProps) {
             <div className="flex flex-wrap items-center gap-2">
               {menuItems.map((item) => {
                 const Icon = item.icon;
+                const isActive = isMenuItemActive(item.id);
 
                 return (
                   <button
@@ -246,7 +277,7 @@ export default function Navbar({ currentPage, onNavigate }: NavbarProps) {
                     type="button"
                     onClick={() => onNavigate(item.id)}
                     className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition ${
-                      currentPage === item.id
+                      isActive
                         ? "bg-brand/10 text-brand"
                         : "text-gray-700 hover:bg-gray-100 hover:text-brand"
                     }`}
@@ -273,7 +304,7 @@ export default function Navbar({ currentPage, onNavigate }: NavbarProps) {
 
         {mobileMenuOpen && (
           <div className="border-t border-gray-200 bg-white md:hidden">
-            <div className="space-y-3 px-4 pb-24 pt-4">
+            <div className="space-y-4 px-4 pb-24 pt-4">
               <button
                 type="button"
                 onClick={() => handleNavigate("properties")}
@@ -282,7 +313,7 @@ export default function Navbar({ currentPage, onNavigate }: NavbarProps) {
                 <Search className="h-5 w-5 text-gray-400" />
                 <span className="text-sm text-gray-500">
                   {language === "tr"
-                    ? 'Satılık, kiralık, araç ilanı ara...'
+                    ? "Satılık, kiralık, araç ilanı ara..."
                     : "Search sale, rent or vehicle listings..."}
                 </span>
               </button>
@@ -296,6 +327,7 @@ export default function Navbar({ currentPage, onNavigate }: NavbarProps) {
                 {menuItems.map((item, index) => {
                   const Icon = item.icon;
                   const isLast = index === menuItems.length - 1;
+                  const isActive = isMenuItemActive(item.id);
 
                   return (
                     <button
@@ -303,15 +335,20 @@ export default function Navbar({ currentPage, onNavigate }: NavbarProps) {
                       type="button"
                       onClick={() => handleNavigate(item.id)}
                       className={`flex w-full items-center gap-3 px-4 py-3 text-left transition ${
-                        currentPage === item.id
+                        isActive
                           ? "bg-brand/5 text-brand"
                           : "text-gray-700 hover:bg-gray-50"
                       } ${!isLast ? "border-b border-gray-100" : ""}`}
                     >
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gray-100">
+                      <div
+                        className={`flex h-10 w-10 items-center justify-center rounded-full ${
+                          isActive ? "bg-brand/10" : "bg-gray-100"
+                        }`}
+                      >
                         <Icon className="h-5 w-5" />
                       </div>
                       <span className="font-medium">{item.label}</span>
+                      <ChevronRight className="ml-auto h-4 w-4 text-gray-300" />
                     </button>
                   );
                 })}
@@ -340,6 +377,17 @@ export default function Navbar({ currentPage, onNavigate }: NavbarProps) {
                   </span>
                 </button>
 
+                <button
+                  type="button"
+                  onClick={() => handleNavigate("contact")}
+                  className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-white px-4 py-3 text-left text-gray-700"
+                >
+                  <Phone className="h-5 w-5 text-brand" />
+                  <span className="font-medium">
+                    {language === "tr" ? "İletişim" : "Contact"}
+                  </span>
+                </button>
+
                 {user ? (
                   <>
                     <button
@@ -347,9 +395,9 @@ export default function Navbar({ currentPage, onNavigate }: NavbarProps) {
                       onClick={() => handleNavigate("admin")}
                       className="flex items-center gap-3 rounded-2xl bg-cta px-4 py-3 text-left text-white"
                     >
-                      <User className="h-5 w-5" />
+                      <ShieldCheck className="h-5 w-5" />
                       <span className="font-medium">
-                        {language === "tr" ? "Hesap Paneli" : "Account Panel"}
+                        {language === "tr" ? "Admin Paneli" : "Admin Panel"}
                       </span>
                     </button>
 

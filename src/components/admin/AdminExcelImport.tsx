@@ -1,5 +1,5 @@
 // src/components/admin/AdminExcelImport.tsx
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as XLSX from "xlsx";
 import {
   AlertCircle,
@@ -21,11 +21,13 @@ import {
 import { supabase } from "../../lib/supabase";
 
 type ImportablePropertyRow = {
+  id?: string | null;
   title: string;
   description: string;
   property_type: string;
   status: string;
   price: number;
+  old_price: number | null;
   currency: string;
   location: string;
   city: string;
@@ -228,11 +230,13 @@ const MODERATION_MAP: Record<string, string> = {
 };
 
 const COLUMN_GUIDE: ColumnGuideItem[] = [
+  { label: "İlan ID", aliases: ["id", "ilan_id", "property_id"], example: "uuid-değeri" },
   { label: "Başlık", aliases: ["title", "başlık", "baslik"], example: "Denizli Merkezde Satılık 3+1 Daire", required: true },
   { label: "Açıklama", aliases: ["description", "açıklama", "aciklama"], example: "Geniş kullanım alanına sahip, merkezi konumda..." },
   { label: "Emlak Türü", aliases: ["property_type", "emlak_türü", "emlak_turu", "type", "tür"], example: "Daire / apartment / Villa / Arsa", required: true },
   { label: "Durum", aliases: ["status", "durum"], example: "satılık / kiralık / for_sale / for_rent" },
   { label: "Fiyat", aliases: ["price", "fiyat"], example: "3250000", required: true },
+  { label: "Eski Fiyat", aliases: ["old_price", "eski_fiyat", "eski fiyat"], example: "3500000" },
   { label: "Para Birimi", aliases: ["currency", "para_birimi", "para birimi"], example: "TRY / USD / EUR" },
   { label: "Şehir", aliases: ["city", "şehir", "sehir", "il"], example: "Denizli", required: true },
   { label: "İlçe", aliases: ["district", "ilçe", "ilce"], example: "Pamukkale" },
@@ -372,6 +376,7 @@ function buildFallbackDescription(row: {
   district: string | null;
   area: number;
   price: number;
+  old_price: number | null;
   currency: string;
   rooms: number;
   bathrooms: number;
@@ -395,7 +400,11 @@ function buildFallbackDescription(row: {
   if (row.rooms > 0) parts.push(`Oda sayısı: ${row.rooms}.`);
   if (row.bathrooms > 0) parts.push(`Banyo sayısı: ${row.bathrooms}.`);
   if (row.location) parts.push(`Konum: ${row.location}.`);
-  parts.push(`Fiyat: ${formatMoneyTR(row.price, row.currency)}.`);
+  if (row.old_price && row.old_price > row.price) {
+    parts.push(`İndirimli fiyat: ${formatMoneyTR(row.price, row.currency)}. Eski fiyat: ${formatMoneyTR(row.old_price, row.currency)}.`);
+  } else {
+    parts.push(`Fiyat: ${formatMoneyTR(row.price, row.currency)}.`);
+  }
   return parts.join(" ");
 }
 
@@ -499,8 +508,10 @@ function buildNormalizedRow(rawRow: Record<string, unknown>): ParsedPreviewRow {
     ])
   );
 
+  const id = normalizeText(pickValue(rawRow, ["id", "ilan_id", "property_id"])) || null;
   const status = mapStatus(pickValue(rawRow, ["status", "durum"]));
   const parsedPrice = parseNullableNumber(pickValue(rawRow, ["price", "fiyat"]));
+  const parsedOldPrice = parseNullableNumber(pickValue(rawRow, ["old_price", "eski_fiyat", "eski fiyat"]));
   const currency = mapCurrency(
     pickValue(rawRow, ["currency", "para_birimi", "para birimi"])
   );
@@ -641,6 +652,7 @@ function buildNormalizedRow(rawRow: Record<string, unknown>): ParsedPreviewRow {
   const baseArea = areaValue ?? netAreaValue ?? grossAreaValue ?? 0;
 
   const normalizedCandidate: ImportablePropertyRow = {
+    id,
     title,
     description:
       cleanDescription(rawDescription) ||
@@ -651,6 +663,7 @@ function buildNormalizedRow(rawRow: Record<string, unknown>): ParsedPreviewRow {
         district: district || null,
         area: baseArea,
         price: parsedPrice ?? 0,
+        old_price: parsedOldPrice,
         currency,
         rooms,
         bathrooms,
@@ -659,6 +672,7 @@ function buildNormalizedRow(rawRow: Record<string, unknown>): ParsedPreviewRow {
     property_type,
     status,
     price: parsedPrice ?? 0,
+    old_price: parsedOldPrice,
     currency,
     location,
     city,
@@ -798,6 +812,7 @@ function downloadTemplateWorkbook(): void {
       property_type: "Daire",
       status: "satılık",
       price: 3250000,
+      old_price: 3500000,
       currency: "TRY",
       city: "Denizli",
       district: "Pamukkale",
@@ -840,6 +855,7 @@ function downloadTemplateWorkbook(): void {
       property_type: "Ofis",
       status: "kiralık",
       price: 45000,
+      old_price: 50000,
       currency: "TRY",
       city: "Denizli",
       district: "Merkezefendi",
@@ -1415,11 +1431,36 @@ export default function AdminExcelImport({
       setImportResult("");
       addLog("info", `${validPayload.length} ilan için içe aktarma işlemi başlatıldı.`);
 
-      const { error } = await (supabase.from("properties") as any).insert(validPayload);
-      if (error) throw error;
+      const chunkSize = 100;
+      const chunks: ImportablePropertyRow[][] = [];
+      for (let i = 0; i < validPayload.length; i += chunkSize) {
+        chunks.push(validPayload.slice(i, i + chunkSize));
+      }
 
-      setImportResult(`${validPayload.length} ilan başarıyla içe aktarıldı.`);
-      addLog("success", `${validPayload.length} ilan başarıyla içe aktarıldı.`);
+      let importedCount = 0;
+
+      for (const chunk of chunks) {
+        const upsertRows = chunk.filter((item) => item.id);
+        const insertRows = chunk.filter((item) => !item.id);
+
+        if (upsertRows.length > 0) {
+          const { error } = await (supabase.from("properties") as any).upsert(upsertRows, {
+            onConflict: "id",
+          });
+          if (error) throw error;
+          importedCount += upsertRows.length;
+        }
+
+        if (insertRows.length > 0) {
+          const insertPayload = insertRows.map(({ id, ...rest }) => rest);
+          const { error } = await (supabase.from("properties") as any).insert(insertPayload);
+          if (error) throw error;
+          importedCount += insertRows.length;
+        }
+      }
+
+      setImportResult(`${importedCount} ilan başarıyla içe aktarıldı.`);
+      addLog("success", `${importedCount} ilan başarıyla içe aktarıldı.`);
       resetState();
 
       if (onImported) {
@@ -1550,9 +1591,11 @@ export default function AdminExcelImport({
     [filteredRows]
   );
 
-  if (page > totalPages) {
-    setTimeout(() => setPage(totalPages), 0);
-  }
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -1698,14 +1741,14 @@ export default function AdminExcelImport({
       <label className="flex cursor-pointer items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center transition hover:border-brand hover:bg-white">
         <input
           type="file"
-          accept=".xlsx,.xls"
+          accept=".xlsx,.xls,.csv"
           onChange={handleFileChange}
           className="hidden"
         />
         <Upload className="h-5 w-5 text-slate-500" />
         <div>
           <div className="font-medium text-slate-900">Excel dosyasını yüklemek için tıkla</div>
-          <div className="text-sm text-slate-500">Desteklenen formatlar: .xlsx, .xls</div>
+          <div className="text-sm text-slate-500">Desteklenen formatlar: .xlsx, .xls, .csv</div>
         </div>
       </label>
 
